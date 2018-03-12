@@ -1,6 +1,7 @@
 /* Documentation for CdoExtras */
 module CdoExtras {
-  use Cdo;
+  use Cdo,
+      NumSuch;
 
   writeln("New library: CdoExtras");
 }
