@@ -75,7 +75,9 @@ proc NamedMatrixFromPGRectangular(con: Connection
 
   // This guy is causing problems.  Exterminiate with extreme prejudice
   //forall row in cursor2 {
-  forall row in cursor2 with (+ reduce count) {
+  //forall row in cursor2 with (+ reduce count) {
+  //forall row in cursor2 with (ref count) {
+  for row in cursor2 {
     count += 1;
     indices[count]=(
        rows.get(row[fromField])
