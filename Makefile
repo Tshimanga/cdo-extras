@@ -18,4 +18,4 @@ run:
 run-test: test/CdoExtrasTest.chpl
 	$(CC) $(INCLUDES) $(LIBS) $(MODULES) -M$(SRCDIR) -o test/test $< ; \
 	./test/test -f test/db_creds.txt ; \
-	rm test/test/
+	rm test/test

@@ -33,9 +33,10 @@ class CdoExtrasTest : UnitTest {
     var con = PgConnectionFactory(host=DB_HOST, user=DB_USER, database=DB_NAME, passwd=DB_PWD);
     var nm = NamedMatrixFromPGRectangular(con=con, edgeTable=edgeTable, fromField=fromField
       , toField=toField);
+    assertIntEquals("nm has 7 rows", expected=7, actual=nm.nrows());
     // Should have loaded the data from test/reference/entropy_base_graph_schema.sql
+    //var vnames = vNamesFromPG(con=con, nameTable=nameTable, nameField=nameField, idField=idField);
     /*
-    var vnames = vNamesFromPG(con=con, nameTable=nameTable, nameField=nameField, idField=idField);
     writeln(vnames);
     var X = wFromPG(con=con, edgeTable=edgeTable, fromField=fromField, toField=toField
       , wField=wField, n=vnames.size);
