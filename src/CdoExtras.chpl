@@ -3,106 +3,103 @@ module CdoExtras {
   use Cdo,
       NumSuch;
 
-  writeln("New library: CdoExtras");
 
+/*
+ Creates a NamedMatrix from a table in Postgres.  Does not optimize for square matrices.  This assumption
+ is that the matrix is sparse.
 
+ :arg string edgeTable: The SQL table holding the values of the matrix.
+ :arg string fromField: The table column representing rows, e.g. `i`.
+ :arg string toField: The table column representing columns, e.g. 'j'.
+ :arg string wField: `default=NONE` the table column containing the values of cell `(i,j)``
+ :arg boolean square: Whether the matrix should be built to have the same rows and columns
+ */
+ proc NamedMatrixFromPG(con: Connection
+   , edgeTable: string
+   , fromField: string, toField: string, wField: string = "NONE"
+   , square=false) {
+  if square {
+    return NamedMatrixFromPGSquare(con: Connection
+      , edgeTable, fromField, toField, wField);
+  } else {
+    return NamedMatrixFromPGRectangular(con: Connection
+      , edgeTable, fromField, toField, wField);
+  }
+}
 
+proc NamedMatrixFromPGRectangular(con: Connection
+  , edgeTable: string
+  , fromField: string, toField: string, wField: string = "NONE") {
 
-  /*
-   Creates a NamedMatrix from a table in Postgres.  Does not optimize for square matrices.  This assumption
-   is that the matrix is sparse.
+  var q = """
+  SELECT ftr, t
+  FROM (
+    SELECT distinct(%s) AS ftr, 'r' AS t FROM %s
+    UNION ALL
+    SELECT distinct(%s) AS ftr, 'c' AS t FROM %s
+  ) AS a
+  GROUP BY ftr, t
+  ORDER BY ftr, t ;
+  """;
 
-   :arg string edgeTable: The SQL table holding the values of the matrix.
-   :arg string fromField: The table column representing rows, e.g. `i`.
-   :arg string toField: The table column representing columns, e.g. 'j'.
-   :arg string wField: `default=NONE` the table column containing the values of cell `(i,j)``
-   :arg boolean square: Whether the matrix should be built to have the same rows and columns
-   */
-   proc NamedMatrixFromPG(con: Connection
-     , edgeTable: string
-     , fromField: string, toField: string, wField: string = "NONE"
-     , square=false) {
-    if square {
-      return NamedMatrixFromPGSquare(con: Connection
-        , edgeTable, fromField, toField, wField);
+  var rows: BiMap = new BiMap(),
+      cols: BiMap = new BiMap();
+
+  var cursor = con.cursor();
+  cursor.query(q, (fromField, edgeTable, toField, edgeTable));
+
+  for row in cursor {
+    if row['t'] == 'r' {
+      rows.add(row['ftr']);
+    } else if row['t'] == 'c' {
+      cols.add(row['ftr']);
+    }
+  }
+
+  var D: domain(2) = {1..rows.size(), 1..cols.size()},
+      SD = CSRDomain(D),
+      X: [SD] real;  // the actual data
+
+  var r = """
+  SELECT %s, %s
+  FROM %s
+  ORDER BY %s, %s ;
+  """;
+  var cursor2 = con.cursor();
+  cursor2.query(r, (fromField, toField, edgeTable, fromField, toField));
+  const size = cursor2.rowcount(): int;
+  var count = 0: int,
+      dom = {1..size},
+      indices: [dom] (int, int),
+      values: [dom] real;
+
+  // This guy is causing problems.  Exterminiate with extreme prejudice
+  //forall row in cursor2 {
+  forall row in cursor2 with (+ reduce count) {
+    count += 1;
+    indices[count]=(
+       rows.get(row[fromField])
+      ,cols.get(row[toField])
+      );
+
+    /* This is defunct for the moment
+    if wField == "NONE" {
+      values[count] = 1;
     } else {
-      return NamedMatrixFromPGRectangular(con: Connection
-        , edgeTable, fromField, toField, wField);
-    }
+      values[count] = row[wField]: real;
+    } */
   }
 
-  proc NamedMatrixFromPGRectangular(con: Connection
-    , edgeTable: string
-    , fromField: string, toField: string, wField: string = "NONE") {
-
-    var q = """
-    SELECT ftr, t
-    FROM (
-      SELECT distinct(%s) AS ftr, 'r' AS t FROM %s
-      UNION ALL
-      SELECT distinct(%s) AS ftr, 'c' AS t FROM %s
-    ) AS a
-    GROUP BY ftr, t
-    ORDER BY ftr, t ;
-    """;
-
-    var rows: BiMap = new BiMap(),
-        cols: BiMap = new BiMap();
-
-    var cursor = con.cursor();
-    cursor.query(q, (fromField, edgeTable, toField, edgeTable));
-
-    for row in cursor {
-      if row['t'] == 'r' {
-        rows.add(row['ftr']);
-      } else if row['t'] == 'c' {
-        cols.add(row['ftr']);
-      }
-    }
-
-    var D: domain(2) = {1..rows.size(), 1..cols.size()},
-        SD = CSRDomain(D),
-        X: [SD] real;  // the actual data
-
-    var r = """
-    SELECT %s, %s
-    FROM %s
-    ORDER BY %s, %s ;
-    """;
-    var cursor2 = con.cursor();
-    cursor2.query(r, (fromField, toField, edgeTable, fromField, toField));
-    const size = cursor2.rowcount(): int;
-    var count = 0: int,
-        dom = {1..size},
-        indices: [dom] (int, int),
-        values: [dom] real;
-
-    // This guy is causing problems.  Exterminiate with extreme prejudice
-    //forall row in cursor2 {
-    forall row in cursor2 with (+ reduce count) {
-      count += 1;
-      indices[count]=(
-         rows.get(row[fromField])
-        ,cols.get(row[toField])
-        );
-
-      if wField == "NONE" {
-        values[count] = 1;
-      } else {
-        values[count] = row[wField]: real;
-      }
-    }
-
-    SD.bulkAdd(indices);
-    forall (ij, a) in zip(indices, values) {
-      X(ij) = a;
-    }
-
-    const nm = new NamedMatrix(X=X);
-    nm.rows = rows;
-    nm.cols = cols;
-    return nm;
+  SD.bulkAdd(indices);
+  forall (ij, a) in zip(indices, values) {
+    X(ij) = a;
   }
+
+  const nm = new NamedMatrix(X=X);
+  nm.rows = rows;
+  nm.cols = cols;
+  return nm;
+}
 
 
   /*
