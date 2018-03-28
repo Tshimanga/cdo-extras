@@ -1,0 +1,1 @@
+bulk_insert-test.chpl:1: error: Cannot find module or enum 'NumSuch'

@@ -1,7 +1,7 @@
 DB_HOST=localhost
 #DB_HOST=172.18.0.6
-DB_USER=buddha
-DB_NAME=buddha
-#DB_NAME=loch_brian
-DB_PWD=buddha
+DB_USER=postgres
+DB_NAME=test
+#DB_NAME=buddha
+DB_PWD=noether
 #DB_PWD=D6Adisco!!
