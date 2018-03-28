@@ -55,6 +55,11 @@ class CdoExtrasTest : UnitTest {
 }
 
 proc main(args: [] string) : int {
+  const msg = """
+Please make sure your test database has been populated by the SQL script in
+  test/reference/entropy_base_graph_schema.sql
+""";
+  writeln(msg);
   var t = new CdoExtrasTest(verbose=false);
   var ret = t.run();
   t.report();
