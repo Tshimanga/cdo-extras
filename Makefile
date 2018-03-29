@@ -1,6 +1,6 @@
 include local.mk
 CC=chpl
-INCLUDES=-I$(BLAS_HOME)/include
+INCLUDES=-I$(BLAS_HOME)/include -I$(POSTGRES_HOME)
 LIBS=-L${BLAS_HOME}/lib -lblas
 SRCDIR=src
 BINDIR=target

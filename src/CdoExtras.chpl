@@ -249,7 +249,7 @@ proc NamedMatrixFromPGRectangular(con: Connection
     :arg wField: The field of edgeTable containing the weight of the edge
     :arg n: number of distinct vertices. In practice, this may be gives and the number of names
     :arg weights: Boolean on whether to use the weights in the table or a 1 (indicator)
-   */
+   *//*
   proc wFromPG(con: Connection, edgeTable: string
       , fromField: string, toField: string, wField: string, weights=false) {
     var q = "SELECT %s, %s FROM %s ORDER BY 1, 2;";
@@ -266,8 +266,8 @@ proc NamedMatrixFromPGRectangular(con: Connection
     cursor3.query(target_size_q);
     const row2 = cursor2.fetchone();
     const row3 = cursor3.fetchone();
-    const source_size = row2['n']: int;
-    const exhibit_size = row3['n']: int;
+    const source_size = try row2['n']: int;
+    const exhibit_size = try row3['n']: int;
 
     var cursor = con.cursor();
     cursor.query(q,(fromField, toField, edgeTable));
@@ -313,7 +313,7 @@ proc NamedMatrixFromPGRectangular(con: Connection
     }
      return W;
   }
-
+*/
 
   /*
 
