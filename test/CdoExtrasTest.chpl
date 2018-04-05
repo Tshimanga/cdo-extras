@@ -26,13 +26,48 @@ class CdoExtrasTest : UnitTest {
         toField = "exhibited_cui";
 
     var con = PgConnectionFactory(host=DB_HOST, user=DB_USER, database=DB_NAME, passwd=DB_PWD);
-    var t: Timer;
-    t.start();
-    var nm = NamedMatrixFromPGRectangular(con=con, edgeTable=edgeTable, fromField=fromField
+    var t1: Timer;
+    t1.start();
+    var nm = NamedMatrixFromPGSquare(con=con, edgeTable=edgeTable, fromField=fromField
       , toField=toField);
-    t.stop();
+    t1.stop();
 
-    writeln(t.elapsed());
+    writeln("Dimensions are: ",nm.D);
+    writeln("Time Elapsed to Load Matrix: ",t1.elapsed());
+
+    var g = new Graph(nm);
+
+    var t2: Timer;
+
+    t2.start();
+    g.intoxicate();
+    t2.stop();
+
+    writeln("Time to Intoxicate: ",t2.elapsed());
+
+    var t3: Timer;
+    t3.start();
+    var distM = distMatrix(g);
+    t3.stop();
+
+    writeln("Time to Compute all Distances: ", t3.elapsed());
+
+    var t4: Timer;
+    t4.start();
+    var diameter = aMax(distM, axis = 0);
+    t5.start();
+
+    writeln("Diameter: ", diameter);
+    writeln("Time to Extract Diameter: ",t4.elapsed());
+
+    var t5: Timer;
+    t5.start();
+    var comps = components(g);
+    t5.stop();
+
+    var numComps = max reduce comps;
+    writeln("Number of Components: ", numComps);
+    writeln("Time to Calculate the Number of Components: ", t5.elapsed());
   //  assertIntEquals("nm has 7 rows", expected=7, actual=nm.nrows());
     // Should have loaded the data from test/reference/entropy_base_graph_schema.sql
     //var vnames = vNamesFromPG(con=con, nameTable=nameTable, nameField=nameField, idField=idField);
