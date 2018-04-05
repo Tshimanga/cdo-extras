@@ -55,7 +55,7 @@ class CdoExtrasTest : UnitTest {
     var t4: Timer;
     t4.start();
     var diameter = aMax(distM, axis = 0);
-    t5.start();
+    t4.stop();
 
     writeln("Diameter: ", diameter);
     writeln("Time to Extract Diameter: ",t4.elapsed());

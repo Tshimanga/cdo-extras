@@ -125,7 +125,7 @@ proc NamedMatrixFromPGRectangular(con: Connection
       cursor.query(q, (fromField, edgeTable, toField, edgeTable));
       var rows: BiMap = new BiMap();
 
-      forall row in cursor {
+      for row in cursor {
       //for row in cursor {
         rows.add(row['ftr']);
       }
