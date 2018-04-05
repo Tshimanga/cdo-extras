@@ -3,3 +3,4 @@ target/
 Mason.lock
 
 local.mk
+test/db_creds.txt

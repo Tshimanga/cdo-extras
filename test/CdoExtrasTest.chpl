@@ -1,6 +1,7 @@
 use NumSuch,
     CdoExtras,
     Postgres,
+    Time,
     Charcoal;
 
 config const DB_HOST: string = "";
@@ -20,20 +21,19 @@ class CdoExtrasTest : UnitTest {
   }
 
   proc testBuildNamedMatrix() {
-    var nameTable = "r.cho_names",
-        idField = "ftr_id",
-        nameField = "name",
-        edgeTable = "r.cho_edges",
-        fromField = "from_fid",
-        toField = "to_fid",
-        wField = "w",
-        wTable = "r.condition_w",
-        n = 8;
+    var edgeTable = "r.cui_confabulation",
+        fromField = "source_cui",
+        toField = "exhibited_cui";
 
     var con = PgConnectionFactory(host=DB_HOST, user=DB_USER, database=DB_NAME, passwd=DB_PWD);
+    var t: Timer;
+    t.start();
     var nm = NamedMatrixFromPGRectangular(con=con, edgeTable=edgeTable, fromField=fromField
       , toField=toField);
-    assertIntEquals("nm has 7 rows", expected=7, actual=nm.nrows());
+    t.stop();
+
+    writeln(t.elapsed());
+  //  assertIntEquals("nm has 7 rows", expected=7, actual=nm.nrows());
     // Should have loaded the data from test/reference/entropy_base_graph_schema.sql
     //var vnames = vNamesFromPG(con=con, nameTable=nameTable, nameField=nameField, idField=idField);
     /*
@@ -45,9 +45,10 @@ class CdoExtrasTest : UnitTest {
     //persistSparseMatrix(con, aTable=wTable, fromField=fromField, toField=toField, weightField=wField, X=X);
   }
 
+
   proc run() {
     super.run();
-    testPingPostgres();
+  //  testPingPostgres();
     testBuildNamedMatrix();
 
     return 0;
