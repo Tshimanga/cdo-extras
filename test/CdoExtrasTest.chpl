@@ -1,4 +1,5 @@
 use NumSuch,
+    Chingon,
     CdoExtras,
     Postgres,
     Time,

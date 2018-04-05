@@ -4,7 +4,7 @@ INCLUDES=-I$(BLAS_HOME)/include -I$(POSTGRES_HOME)
 LIBS=-L${BLAS_HOME}/lib -lblas
 SRCDIR=src
 BINDIR=target
-MODULES=-M$(CDO_HOME)/src -M$(NUMSUCH_HOME)/src -M$(CHARCOAL_HOME)/src
+MODULES=-M$(CDO_HOME)/src -M$(NUMSUCH_HOME)/src -M$(CHARCOAL_HOME)/src -M$(CHINGON_HOME)/src
 EXEC=cdoExtras
 
 default: all
