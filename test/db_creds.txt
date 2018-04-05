@@ -1,7 +1,0 @@
-#DB_HOST=localhost
-DB_HOST=52.176.63.131
-DB_USER=buddha
-DB_NAME=loch_brian
-#DB_NAME=buddha
-#DB_PWD=noether
-DB_PWD=D6Adisco!!
