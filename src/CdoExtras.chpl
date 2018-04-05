@@ -56,7 +56,87 @@ proc NamedMatrixFromPGRectangular(con: Connection
     }
   }
 
+
   var D: domain(2) = {1..rows.size(), 1..cols.size()},
+      SD = CSRDomain(D),
+      X: [SD] real;  // the actual data
+
+  var r = """
+  SELECT %s, %s
+  FROM %s
+  ORDER BY %s, %s ;
+  """;
+  var cursor2 = con.cursor();
+  cursor2.query(r, (fromField, toField, edgeTable, fromField, toField));
+  const size = cursor2.rowcount(): int;
+  var count = 0: int,
+      dom = {1..size},
+      indices: [dom] (int, int),
+      values: [dom] real;
+
+  // This guy is causing problems.  Exterminiate with extreme prejudice
+  //forall row in cursor2 {
+  //forall row in cursor2 with (+ reduce count) {
+  //forall row in cursor2 with (ref count) {
+  for row in cursor2 {
+    count += 1;
+    indices[count]=(
+       rows.get(row[fromField])
+      ,cols.get(row[toField])
+      );
+
+    /* This is defunct for the moment
+    if wField == "NONE" {
+      values[count] = 1;
+    } else {
+      values[count] = row[wField]: real;
+    } */
+  }
+
+  SD.bulkAdd(indices);
+  forall (ij, a) in zip(indices, values) {
+    X(ij) = a;
+  }
+
+  const nm = new NamedMatrix(X=X);
+  nm.rows = rows;
+  nm.cols = cols;
+  return nm;
+}
+
+
+proc NamedMatrixFromPGSquare(con: Connection
+  , edgeTable: string
+  , fromField: string, toField: string, wField: string = "NONE") {
+
+  var q = """
+  SELECT ftr, t
+  FROM (
+    SELECT distinct(%s) AS ftr, 'r' AS t FROM %s
+    UNION ALL
+    SELECT distinct(%s) AS ftr, 'c' AS t FROM %s
+  ) AS a
+  GROUP BY ftr, t
+  ORDER BY ftr, t ;
+  """;
+
+  var rows: BiMap = new BiMap(),
+      cols: BiMap = new BiMap();
+
+  var cursor = con.cursor();
+  cursor.query(q, (fromField, edgeTable, toField, edgeTable));
+
+  for row in cursor {
+    if row['t'] == 'r' {
+      rows.add(row['ftr']);
+    } else if row['t'] == 'c' {
+      cols.add(row['ftr']);
+    }
+  }
+
+  var verts = rows.uni(cols);
+
+  var D: domain(2) = {1..verts.size(), 1..verts.size()},
       SD = CSRDomain(D),
       X: [SD] real;  // the actual data
 
@@ -107,7 +187,7 @@ proc NamedMatrixFromPGRectangular(con: Connection
   /*
    Build a square version of the matrix.  Still directed, but with the same number of rows/cols
    */
-  proc NamedMatrixFromPGSquare ( con: Connection
+  proc NamedMatrixFromPGSquare_( con: Connection
       , edgeTable: string
       , fromField: string, toField: string, wField: string = "NONE") {
 
