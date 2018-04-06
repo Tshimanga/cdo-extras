@@ -42,13 +42,24 @@ proc NamedMatrixFromPGRectangular(con: Connection
   GROUP BY ftr, t
   ORDER BY ftr, t ;
   """;
-
+  var t: Timer;
+  t.start();
   var rows: BiMap = new BiMap(),
       cols: BiMap = new BiMap();
+  t.stop();
+  writeln("Row/Col BiMap Initialization: ",t.elapsed());
 
+
+  var t1: Timer;
+  t1.start();
   var cursor = con.cursor();
   cursor.query(q, (fromField, edgeTable, toField, edgeTable));
+  t1.stop();
+  writeln("Pulling the Index Set Data into the Cursor: ",t1.elapsed());
 
+
+  var t2: Timer;
+  t2.start();
   for row in cursor {
     if row['t'] == 'r' {
       rows.add(row['ftr']);
@@ -56,35 +67,60 @@ proc NamedMatrixFromPGRectangular(con: Connection
       cols.add(row['ftr']);
     }
   }
+  t2.stop();
+  writeln("Populating the Row/Col BiMaps: ",t2.elapsed());
 
-
+  var t3: Timer;
+  t3.start();
   var D: domain(2) = {1..rows.size(), 1..cols.size()},
       SD = CSRDomain(D),
       X: [SD] real;  // the actual data
+  t3.stop();
+  writeln("Initializating the Base Matrix: ",t3.elapsed());
 
   var r = """
   SELECT %s, %s
   FROM %s
   ORDER BY %s, %s ;
   """;
+
+  var t4: Timer;
+  t4.start();
   var cursor2 = con.cursor();
   cursor2.query(r, (fromField, toField, edgeTable, fromField, toField));
+  t4.stop();
+  writeln("Pulling the Adjacency Data into the Second Cursor: ",t4.elapsed());
+
+  var t5: Timer;
+  t5.start();
   const size = cursor2.rowcount(): int;
+  t5.stop();
+  writeln("Reading the Size of the Second Cursor: ",t5.elapsed());
+
+  var t6: Timer;
+  t6.start();
   var count = 0: int,
       dom = {1..size},
       indices: [dom] (int, int),
       values: [dom] real;
+  t6.stop();
+  writeln("Initializing Indices/Values Arrays: ",t6.elapsed());
 
   // This guy is causing problems.  Exterminiate with extreme prejudice
   //forall row in cursor2 {
   //forall row in cursor2 with (+ reduce count) {
   //forall row in cursor2 with (ref count) {
+
+  var t7: Timer;
+  t7.start();
   for row in cursor2 {
     count += 1;
     indices[count]=(
        rows.get(row[fromField])
       ,cols.get(row[toField])
       );
+  t7.stop();
+  writeln("Writing to Indices/Values: ",t7.elapsed());
 
     /* This is defunct for the moment
     if wField == "NONE" {
@@ -94,14 +130,27 @@ proc NamedMatrixFromPGRectangular(con: Connection
     } */
   }
 
+  var t8: Timer;
+  t8.start();
   SD.bulkAdd(indices);
+  t8.stop();
+  writeln("Time to BulkAdd Indices: ",t8.elapsed());
+
+  var t9: Timer;
+  t9.start();
   for ij in indices {
     X(ij) = 1;
   }
+  t9.stop();
+  writeln("Assigning Values: ",t9.elapsed());
 
+  var t10: Timer;
+  t10.start();
   const nm = new NamedMatrix(X=X);
   nm.rows = rows;
   nm.cols = cols;
+  t10.stop();
+  writeln("Promoting to NamedMatrix: ",t10.elapsed());
   return nm;
 }
 
