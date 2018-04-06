@@ -1,6 +1,7 @@
 /* Documentation for CdoExtras */
 module CdoExtras {
   use Cdo,
+      Time,
       NumSuch;
 
 
@@ -94,8 +95,8 @@ proc NamedMatrixFromPGRectangular(con: Connection
   }
 
   SD.bulkAdd(indices);
-  forall (ij, a) in zip(indices, values) {
-    X(ij) = a;
+  for ij in indices {
+    X(ij) = 1;
   }
 
   const nm = new NamedMatrix(X=X);
@@ -119,13 +120,23 @@ proc NamedMatrixFromPGSquare(con: Connection
   GROUP BY ftr, t
   ORDER BY ftr, t ;
   """;
-
+  var t1: Timer;
+  t1.start();
   var rows: BiMap = new BiMap(),
       cols: BiMap = new BiMap();
+  t1.stop();
+  writeln("BiMap initialization time: ", t1.elapsed());
 
+  var t2: Timer;
+  t2.start();
   var cursor = con.cursor();
   cursor.query(q, (fromField, edgeTable, toField, edgeTable));
+  t2.stop();
+  writeln("Query 1 Handle Time: ",t2.elapsed());
 
+
+  var t3: Timer;
+  t3.start();
   for row in cursor {
     if row['t'] == 'r' {
       rows.add(row['ftr']);
@@ -133,37 +144,65 @@ proc NamedMatrixFromPGSquare(con: Connection
       cols.add(row['ftr']);
     }
   }
+  t3.stop();
+  writeln("Row/Col BiMap Build Time: ",t3.elapsed());
 
+  var t4: Timer;
+  t4.start();
   var verts = rows.uni(cols);
+  t4.stop();
+  writeln("Row/Col Union Time: ",t4.elapsed());
 
+  var t5: Timer;
+  t5.start();
   var D: domain(2) = {1..verts.size(), 1..verts.size()},
       SD = CSRDomain(D),
       X: [SD] real;  // the actual data
+  t5.stop();
+  writeln("Matrix Initialization Time: ",t5.elapsed());
 
   var r = """
   SELECT %s, %s
   FROM %s
   ORDER BY %s, %s ;
   """;
+
+  var t6: Timer;
+  t6.start();
   var cursor2 = con.cursor();
   cursor2.query(r, (fromField, toField, edgeTable, fromField, toField));
+  t6.stop();
+  writeln("Query 2 Handle Time: ",t6.elapsed());
+
+  var t7: Timer;
+  t7.start();
   const size = cursor2.rowcount(): int;
+  t7.stop();
+  writeln("Cursor Length Read Time: ",t7.elapsed());
+
+  var t8: Timer;
+  t8.start();
   var count = 0: int,
       dom = {1..size},
       indices: [dom] (int, int),
       values: [dom] real;
+  t8.stop();
+  writeln("Index/Value Array Initialization Time: ",t8.elapsed());
 
   // This guy is causing problems.  Exterminiate with extreme prejudice
   //forall row in cursor2 {
   //forall row in cursor2 with (+ reduce count) {
   //forall row in cursor2 with (ref count) {
+  var t9: Timer;
+  t9.start();
   for row in cursor2 {
     count += 1;
     indices[count]=(
        rows.get(row[fromField])
       ,cols.get(row[toField])
       );
-
+  t9.stop();
+  writeln("Time to Populate Indices: ",t9.elapsed());
     /* This is defunct for the moment
     if wField == "NONE" {
       values[count] = 1;
@@ -172,14 +211,28 @@ proc NamedMatrixFromPGSquare(con: Connection
     } */
   }
 
-  SD.bulkAdd(indices);
-  forall (ij, a) in zip(indices, values) {
-    X(ij) = a;
-  }
 
+  var t10: Timer;
+  t10.start();
+  SD.bulkAdd(indices);
+  t10.stop();
+  writeln("Time to BulkAdd Indices: ",t10.elapsed());
+
+  var t11: Timer;
+  t11.start();
+  for ij in indices {
+    X(ij) = 1;
+  }
+  t11.stop();
+  writeln("Assign Values in the Matrix: ");
+
+  var t12: Timer;
+  t12.start();
   const nm = new NamedMatrix(X=X);
-  nm.rows = rows;
-  nm.cols = cols;
+  nm.rows = verts;
+  nm.cols = verts;
+  t12.stop();
+  writeln("Making the NamedMatrix: ",t12.elapsed());
   return nm;
 }
 
