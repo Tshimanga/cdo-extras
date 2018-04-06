@@ -35,7 +35,7 @@ class CdoExtrasTest : UnitTest {
 
     writeln("Dimensions are: ",nm.D);
     writeln("Time Elapsed to Load Matrix: ",t1.elapsed());
-
+/*
     var g = new Graph(nm);
 
     var t2: Timer;
@@ -68,7 +68,7 @@ class CdoExtrasTest : UnitTest {
 
     var numComps = max reduce comps;
     writeln("Number of Components: ", numComps);
-    writeln("Time to Calculate the Number of Components: ", t5.elapsed());
+    writeln("Time to Calculate the Number of Components: ", t5.elapsed());*/
   //  assertIntEquals("nm has 7 rows", expected=7, actual=nm.nrows());
     // Should have loaded the data from test/reference/entropy_base_graph_schema.sql
     //var vnames = vNamesFromPG(con=con, nameTable=nameTable, nameField=nameField, idField=idField);
