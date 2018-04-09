@@ -30,6 +30,36 @@ class CdoExtrasTest : UnitTest {
     var con = PgConnectionFactory(host=DB_HOST, user=DB_USER, database=DB_NAME, passwd=DB_PWD);
     t.stop();
     writeln("Time to Establish Connection to the DB: ",t.elapsed());
+
+    var t1: Timer;
+    t1.start();
+    var cursor = con.cursor();
+    t1.stop();
+    writeln("Time to Create Cursor: ",t1.elapsed());
+
+    var q = """
+    SELECT ftr
+    FROM (
+      SELECT distinct(source_cui) AS ftr FROM r.cui_confabulation
+      UNION ALL
+      SELECT distinct(exhibited_cui) AS ftr FROM r.cui_confabulation
+    ) AS a
+    GROUP BY ftr ORDER BY ftr;
+    """;
+
+    var t2: Timer;
+    t2.start();
+    var rows: BiMap = new BiMap();
+    t2.stop();
+    writeln("Time to Initialize Rows BiMap: ",t2.elapsed());
+
+    var t3: Timer;
+    t3.start();
+    cursor.query(q);
+    t3.stop();
+    writeln("Time to Query the DB: ",t3.elapsed());
+
+
     /*
     var t1: Timer;
     t1.start();
