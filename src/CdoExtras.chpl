@@ -54,384 +54,157 @@ proc NamedMatrixFromPGRectangular(con: Connection
   GROUP BY ftr, t
   ORDER BY ftr, t ;
   """;
-  var t: Timer;
-  t.start();
-  var rows: BiMap = new BiMap(),
-      cols: BiMap = new BiMap();
-  t.stop();
-  writeln("Row/Col BiMap Initialization: ",t.elapsed());
 
+  var rows1: BiMap = new BiMap(),
+      cols1: BiMap = new BiMap();
 
-  var t1: Timer;
-  t1.start();
   var cursor = con.cursor();
   cursor.query(q, (fromField, edgeTable, toField, edgeTable));
-  t1.stop();
-  writeln("Pulling the Index Set Data into the Cursor: ",t1.elapsed());
 
-
-  var t2: Timer;
-  t2.start();
   for row in cursor {
     if row['t'] == 'r' {
-      rows.add(row['ftr']);
+      rows1.add(row['ftr']);
     } else if row['t'] == 'c' {
-      cols.add(row['ftr']);
+      cols1.add(row['ftr']);
     }
   }
-  t2.stop();
-  writeln("Populating the Row/Col BiMaps: ",t2.elapsed());
 
-  var t3: Timer;
-  t3.start();
-  var D: domain(2) = {1..rows.size(), 1..cols.size()},
+  var D: domain(2) = {1..rows1.size(), 1..cols1.size()},
       SD = CSRDomain(D),
       X: [SD] real;  // the actual data
-  t3.stop();
-  writeln("Initializating the Base Matrix: ",t3.elapsed());
+  var nm = new NamedMatrix(X=X);
+  nm.rows = rows1;
+  nm.cols = cols1;
 
-  var r = """
-  SELECT %s, %s
-  FROM %s
-  ORDER BY %s, %s ;
-  """;
-
-  var t4: Timer;
-  t4.start();
   var cursor2 = con.cursor();
-  cursor2.query(r, (fromField, toField, edgeTable, fromField, toField));
-  t4.stop();
-  writeln("Pulling the Adjacency Data into the Second Cursor: ",t4.elapsed());
+  if wField == "NONE" {
+    var r = """
+    SELECT %s, %s
+    FROM %s
+    ORDER BY %s, %s ;
+    """;
+    cursor2.query(r, (fromField, toField, edgeTable, fromField, toField));
+  } else if wField != "NONE" {
+    var r = """
+    SELECT %s, %s, %s
+    FROM %s
+    ORDER BY %s, %s ;
+    """;
+    cursor2.query(r, (fromField, toField, wField, edgeTable, fromField, toField));
+  }
 
-  var t5: Timer;
-  t5.start();
-  const size = cursor2.rowcount(): int;
-  t5.stop();
-  writeln("Reading the Size of the Second Cursor: ",t5.elapsed());
-
-  var t6: Timer;
-  t6.start();
+  var size = cursor2.rowcount(): int;
   var count = 0: int,
       dom = {1..size},
       indices: [dom] (int, int),
       values: [dom] real;
-  t6.stop();
-  writeln("Initializing Indices/Values Arrays: ",t6.elapsed());
 
-  // This guy is causing problems.  Exterminiate with extreme prejudice
-  //forall row in cursor2 {
-  //forall row in cursor2 with (+ reduce count) {
-  //forall row in cursor2 with (ref count) {
-
-  var t7: Timer;
-  t7.start();
   for row in cursor2 {
     count += 1;
     indices[count]=(
-       rows.get(row[fromField])
-      ,cols.get(row[toField])
+       rows1.get(row[fromField])
+      ,cols1.get(row[toField])
       );
-  t7.stop();
-  writeln("Writing to Indices/Values: ",t7.elapsed());
-
-    /* This is defunct for the moment
-    if wField == "NONE" {
-      values[count] = 1;
-    } else {
-      values[count] = row[wField]: real;
-    } */
+    if wField != "NONE" {
+      try! values[count] = row[wField]: real; // don't understand why the try! is necessary
+    }
   }
 
-  var t8: Timer;
-  t8.start();
-  SD.bulkAdd(indices);
-  t8.stop();
-  writeln("Time to BulkAdd Indices: ",t8.elapsed());
+  nm.SD.bulkAdd(indices);
 
-  var t9: Timer;
-  t9.start();
-  for ij in indices {
-    X(ij) = 1;
+  if wField == "NONE" {
+    for (i,j) in indices {
+        nm.X(i,j) = 1;
+    }
+  } else if wField != "NONE" {
+    for (ij, a) in zip(indices, values) {
+      nm.X(ij) = a;
+    }
   }
-  t9.stop();
-  writeln("Assigning Values: ",t9.elapsed());
 
-  var t10: Timer;
-  t10.start();
-  const nm = new NamedMatrix(X=X);
-  nm.rows = rows;
-  nm.cols = cols;
-  t10.stop();
-  writeln("Promoting to NamedMatrix: ",t10.elapsed());
   return nm;
 }
+
+
 
 
 proc NamedMatrixFromPGSquare(con: Connection
   , edgeTable: string
   , fromField: string, toField: string, wField: string = "NONE") {
 
-  var q = """
-  SELECT ftr, t
-  FROM (
-    SELECT distinct(%s) AS ftr, 'r' AS t FROM %s
-    UNION ALL
-    SELECT distinct(%s) AS ftr, 'c' AS t FROM %s
-  ) AS a
-  GROUP BY ftr, t
-  ORDER BY ftr, t ;
-  """;
-  var t1: Timer;
-  t1.start();
-  var rows: BiMap = new BiMap(),
-      cols: BiMap = new BiMap();
-  t1.stop();
-  writeln("BiMap initialization time: ", t1.elapsed());
+    var q = """
+    SELECT ftr
+    FROM (
+      SELECT distinct(%s) AS ftr FROM %s
+      UNION ALL
+      SELECT distinct(%s) AS ftr FROM %s
+    ) AS a
+    GROUP BY ftr ORDER BY ftr;
+    """;
 
-  var t2: Timer;
-  t2.start();
-  var cursor = con.cursor();
-  cursor.query(q, (fromField, edgeTable, toField, edgeTable));
-  t2.stop();
-  writeln("Query 1 Handle Time: ",t2.elapsed());
+    var cursor = con.cursor();
+    cursor.query(q, (fromField, edgeTable, toField, edgeTable));
 
-
-  var t3: Timer;
-  t3.start();
-  for row in cursor {
-    if row['t'] == 'r' {
-      rows.add(row['ftr']);
-    } else if row['t'] == 'c' {
-      cols.add(row['ftr']);
+    var rows1: BiMap = new BiMap();
+    for row in cursor {
+      rows1.add(row['ftr']);
     }
-  }
-  t3.stop();
-  writeln("Row/Col BiMap Build Time: ",t3.elapsed());
 
-  var t4: Timer;
-  t4.start();
-  var verts = rows.uni(cols);
-  t4.stop();
-  writeln("Row/Col Union Time: ",t4.elapsed());
+    var D: domain(2) = {1..rows1.size(), 1..rows1.size()},
+        SD = CSRDomain(D),
+        X: [SD] real;
+    var nm = new NamedMatrix(X=X);
+    nm.rows = rows1;
+    nm.cols = rows1;
 
-  var t5: Timer;
-  t5.start();
-  var D: domain(2) = {1..verts.size(), 1..verts.size()},
-      SD = CSRDomain(D),
-      X: [SD] real;  // the actual data
-  t5.stop();
-  writeln("Matrix Initialization Time: ",t5.elapsed());
-
-  var r = """
-  SELECT %s, %s
-  FROM %s
-  ORDER BY %s, %s ;
-  """;
-
-  var t6: Timer;
-  t6.start();
-  var cursor2 = con.cursor();
-  cursor2.query(r, (fromField, toField, edgeTable, fromField, toField));
-  t6.stop();
-  writeln("Query 2 Handle Time: ",t6.elapsed());
-
-  var t7: Timer;
-  t7.start();
-  const size = cursor2.rowcount(): int;
-  t7.stop();
-  writeln("Cursor Length Read Time: ",t7.elapsed());
-
-  var t8: Timer;
-  t8.start();
-  var count = 0: int,
-      dom = {1..size},
-      indices: [dom] (int, int),
-      values: [dom] real;
-  t8.stop();
-  writeln("Index/Value Array Initialization Time: ",t8.elapsed());
-
-  // This guy is causing problems.  Exterminiate with extreme prejudice
-  //forall row in cursor2 {
-  //forall row in cursor2 with (+ reduce count) {
-  //forall row in cursor2 with (ref count) {
-  var t9: Timer;
-  t9.start();
-  for row in cursor2 {
-    count += 1;
-    indices[count]=(
-       rows.get(row[fromField])
-      ,cols.get(row[toField])
-      );
-  t9.stop();
-  writeln("Time to Populate Indices: ",t9.elapsed());
-    /* This is defunct for the moment
+    var cursor2 = con.cursor();
     if wField == "NONE" {
-      values[count] = 1;
-    } else {
-      values[count] = row[wField]: real;
-    } */
-  }
-
-
-  var t10: Timer;
-  t10.start();
-  SD.bulkAdd(indices);
-  t10.stop();
-  writeln("Time to BulkAdd Indices: ",t10.elapsed());
-
-  var t11: Timer;
-  t11.start();
-  for ij in indices {
-    X(ij) = 1;
-  }
-  t11.stop();
-  writeln("Assign Values in the Matrix: ");
-
-  var t12: Timer;
-  t12.start();
-  const nm = new NamedMatrix(X=X);
-  nm.rows = verts;
-  nm.cols = verts;
-  t12.stop();
-  writeln("Making the NamedMatrix: ",t12.elapsed());
-  return nm;
-}
-
-
-  /*
-   Build a square version of the matrix.  Still directed, but with the same number of rows/cols
-   */
-  proc NamedMatrixFromPGSquare_( con: Connection
-      , edgeTable: string
-      , fromField: string, toField: string, wField: string = "NONE") {
-
-      var q = """
-      SELECT ftr
-      FROM (
-        SELECT distinct(%s) AS ftr FROM %s
-        UNION ALL
-        SELECT distinct(%s) AS ftr FROM %s
-      ) AS a
-      GROUP BY ftr ORDER BY ftr;
-      """;
-
-      var cursor = con.cursor();
-      cursor.query(q, (fromField, edgeTable, toField, edgeTable));
-      var rows: BiMap = new BiMap();
-
-      for row in cursor {
-      //for row in cursor {
-        rows.add(row['ftr']);
-      }
-
-      var D: domain(2) = {1..rows.size(), 1..rows.size()},
-          SD = CSRDomain(D),
-          X: [SD] real;  // the actual data
-
       var r = """
       SELECT %s, %s
       FROM %s
       ORDER BY %s, %s ;
       """;
-      var cursor2 = con.cursor();
       cursor2.query(r, (fromField, toField, edgeTable, fromField, toField));
-      var dom1: domain(1) = {1..0},
-          dom2: domain(1) = {1..0},
-          indices: [dom1] (int, int),
-          values: [dom2] real;
-      //forall row in cursor2 {
-      for row in cursor2 {
-        indices.push_back((
-           rows.get(row[fromField])
-          ,rows.get(row[toField])
-          ));
-
-        if wField == "NONE" {
-          values.push_back(1);
-        } else {
-          values.push_back(row[wField]: real);
-        }
-      }
-
-      SD.bulkAdd(indices);
-      forall (ij, a) in zip(indices, values) {
-        X(ij) = a;
-      }
-
-      const nm = new NamedMatrix(X=X);
-      nm.rows = rows;
-      nm.cols = rows;
-      return nm;
-  }
-
-  proc NamedMatrixFromPG_(con: Connection
-    , edgeTable: string
-    , fromField: string, toField: string, wField: string = "NONE") {
-
-    var q = """
-    SELECT ftr, t, row_number() OVER(PARTITION BY t ORDER BY ftr ) AS ftr_id
-    FROM (
-      SELECT distinct(%s) AS ftr, 'r' AS t FROM %s
-      UNION ALL
-      SELECT distinct(%s) AS ftr, 'c' AS t FROM %s
-    ) AS a
-    GROUP BY ftr, t
-    ORDER BY ftr_id, t ;
-    """;
-
-    var rows: BiMap = new BiMap(),
-        cols: BiMap = new BiMap();
-
-    var cursor = con.cursor();
-    cursor.query(q, (fromField, edgeTable, toField, edgeTable));
-    for row in cursor {
-      if row['t'] == 'r' {
-        rows.add(row['ftr'], row['ftr_id']:int);
-      } else if row['t'] == 'c' {
-        cols.add(row['ftr'], row['ftr_id']:int);
-      }
+    } else if wField != "NONE" {
+      var r = """
+      SELECT %s, %s, %s
+      FROM %s
+      ORDER BY %s, %s ;
+      """;
+      cursor2.query(r, (fromField, toField, wField, edgeTable, fromField, toField));
     }
 
-    var D: domain(2) = {1..rows.size(), 1..cols.size()},
-        SD = CSRDomain(D),
-        X: [SD] real;  // the actual data
+    var size = cursor2.rowcount(): int;
+    var count = 0: int,
+        dom = {1..size},
+        indices: [dom] (int, int),
+        values: [dom] real;
 
-    var r = """
-    SELECT %s, %s
-    FROM %s
-    ORDER BY %s, %s ;
-    """;
-    var cursor2 = con.cursor();
-    cursor2.query(r, (fromField, toField, edgeTable, fromField, toField));
-    var dom1: domain(1) = {1..0},
-        dom2: domain(1) = {1..0},
-        indices: [dom1] (int, int),
-        values: [dom2] real;
-
-    //forall row in cursor2 {
     for row in cursor2 {
-  //    writeln("row: ", row[fromField], " -> ", row[toField]);
-      indices.push_back((
-         rows.get(row[fromField])
-        ,cols.get(row[toField])
-        ));
-
-      if wField == "NONE" {
-        values.push_back(1);
-      } else {
-        values.push_back(row[wField]: real);
+      count += 1;
+      indices[count]=(
+         rows1.get(row[fromField])
+        ,rows1.get(row[toField])
+        );
+      if wField != "NONE" {
+        try! values[count] = row[wField]: real; // don't understand why the try! is necessary
       }
     }
-    SD.bulkAdd(indices);
-    for (ij, a) in zip(indices, values) {
-      X(ij) = a;
+
+    nm.SD.bulkAdd(indices);
+
+    if wField == "NONE" {
+      for (i,j) in indices {
+          nm.X(i,j) = 1;
+      }
+    } else if wField != "NONE" {
+      for (ij, a) in zip(indices, values) {
+        nm.X(ij) = a;
+      }
     }
 
-    const nm = new NamedMatrix(X=X);
-    nm.rows = rows;
-    nm.cols = cols;
-    return nm;
-  }
+  return nm;
+}
 
 
   /*
