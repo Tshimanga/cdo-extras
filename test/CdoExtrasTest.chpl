@@ -96,8 +96,58 @@ class CdoExtrasTest : UnitTest {
     writeln("Time for Second DB Query: ",t7.elapsed());
 
 
+    var t8: Timer;
+    t8.start();
+    var dom1: domain(1) = {1..0},
+        dom2: domain(1) = {1..0},
+        indices: [dom1] (int, int),
+        values: [dom2] real;
+    t8.stop();
+    writeln("Time to Initialize Id/Val Arrays: ",t8.elapsed());
+
+    var t9: Timer;
+    t9.start();
+    for row in cursor2 {
+      indices.push_back((rows.get(row['source_cui']),rows.get(row['exhibited_cui'])));
+    }
+    t9.stop();
+    writeln("Time to Push Back on Indices: ",t9.elapsed());
 
 
+
+    var t10: Timer;
+    t10.start();
+    const size1 = cursor2.rowcount(): int;
+    t10.stop();
+    writeln("Cursor Length Read Time: ",t10.elapsed());
+
+    var t11: Timer;
+    t11.start();
+    var count = 0: int,
+        dom = {1..size1},
+        indices1: [dom] (int, int),
+        values1: [dom] real;
+    t11.stop();
+    writeln("Index/Value Array Initialization Time: ",t11.elapsed());
+
+    var t12: Timer;
+    t12.start();
+    for row in cursor2 {
+      count += 1;
+      indices1[count]=(
+         rows.get(row['source_cui'])
+        ,rows.get(row['exhibited_cui'])
+        );
+      }
+    t12.stop();
+    writeln("Time to Graft Indices: ",t12.elapsed());
+
+    var t13: Timer;
+    t13.start();
+    SD.bulkAdd(indices1);
+    t13.stop();
+    writeln("Time to bulkAdd Indices (~10^6) to Sparse Domain: ",t13.elapsed());
+    
     /*
     var t1: Timer;
     t1.start();
