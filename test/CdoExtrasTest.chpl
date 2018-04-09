@@ -147,7 +147,25 @@ class CdoExtrasTest : UnitTest {
     SD.bulkAdd(indices1);
     t13.stop();
     writeln("Time to bulkAdd Indices (~10^6) to Sparse Domain: ",t13.elapsed());
-    
+
+    var t14: Timer;
+    t14.start();
+    for (i,j) in indices {
+      X(i,j) = 1;
+    }
+    t14.stop();
+    writeln("Time to Graft Ones on to Base Matrix: ",t14.elapsed());
+
+
+    var t15: Timer;
+    t15.start();
+    var nm = new NamedMatrix(X=X);
+    nm.rows = rows;
+    nm.cols = rows;
+    t15.stop();
+    writeln("Promoting X to NamedMatrix: ",t15.elapsed());
+
+
     /*
     var t1: Timer;
     t1.start();
