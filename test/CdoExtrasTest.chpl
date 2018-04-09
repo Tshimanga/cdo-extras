@@ -59,6 +59,44 @@ class CdoExtrasTest : UnitTest {
     t3.stop();
     writeln("Time to Query the DB: ",t3.elapsed());
 
+    var t4: Timer;
+    t4.start();
+    for row in cursor {
+      rows.add(row['ftr']);
+    }
+    t4.stop();
+    writeln("Time to Populate Rows BiMap: ",t4.elapsed());
+
+    var t5: Timer;
+    t5.start();
+    var size = rows.size();
+    t5.stop();
+    writeln("Time to Measure Length of Row BiMap: ",t5.elapsed());
+
+    var t6: Timer;
+    t6.start();
+    var D: domain(2) = {1..rows.size(), 1..rows.size()},
+        SD = CSRDomain(D),
+        X: [SD] real;
+    t6.stop();
+    writeln("Time to Initialize Base Matrix: ",t6.elapsed());
+
+    var r = """
+    SELECT source_cui, exhibited_cui
+    FROM r.cui_confabulation
+    ORDER BY source_cui, exhibited_cui ;
+    """;
+
+
+    var cursor2 = con.cursor();
+    var t7: Timer;
+    t7.start();
+    cursor2.query(r);
+    t7.stop();
+    writeln("Time for Second DB Query: ",t7.elapsed());
+
+
+
 
     /*
     var t1: Timer;
