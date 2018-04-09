@@ -25,6 +25,10 @@ class CdoExtrasTest : UnitTest {
     var edgeTable = "r.cui_confabulation",
         fromField = "source_cui",
         toField = "exhibited_cui";
+
+    var t16: Timer;
+    t16.start();
+
     var t: Timer;
     t.start();
     var con = PgConnectionFactory(host=DB_HOST, user=DB_USER, database=DB_NAME, passwd=DB_PWD);
@@ -49,7 +53,7 @@ class CdoExtrasTest : UnitTest {
 
     var t2: Timer;
     t2.start();
-    var rows: BiMap = new BiMap();
+    var rows1: BiMap = new BiMap();
     t2.stop();
     writeln("Time to Initialize Rows BiMap: ",t2.elapsed());
 
@@ -62,24 +66,39 @@ class CdoExtrasTest : UnitTest {
     var t4: Timer;
     t4.start();
     for row in cursor {
-      rows.add(row['ftr']);
+      rows1.add(row['ftr']);
     }
     t4.stop();
     writeln("Time to Populate Rows BiMap: ",t4.elapsed());
 
     var t5: Timer;
     t5.start();
-    var size = rows.size();
+    var size = rows1.size();
     t5.stop();
     writeln("Time to Measure Length of Row BiMap: ",t5.elapsed());
 
+
     var t6: Timer;
     t6.start();
-    var D: domain(2) = {1..rows.size(), 1..rows.size()},
+    var D: domain(2) = {1..rows1.size(), 1..rows1.size()},
         SD = CSRDomain(D),
         X: [SD] real;
     t6.stop();
     writeln("Time to Initialize Base Matrix: ",t6.elapsed());
+
+    var t8: Timer;
+    t8.start();
+    var nm = new NamedMatrix(X=X);
+    t8.stop();
+    writeln("Time to Initialize Empty NamedMatrix from Empty Base Matrix: ",t8.elapsed());
+
+
+    var t9: Timer;
+    t9.start();
+    nm.rows = rows1;
+    nm.cols = rows1;
+    t9.stop();
+    writeln("Time to Set NamedMatrix Rows/Cols BiMaps: ",t9.elapsed());
 
     var r = """
     SELECT source_cui, exhibited_cui
@@ -89,82 +108,68 @@ class CdoExtrasTest : UnitTest {
 
 
     var cursor2 = con.cursor();
-    var t7: Timer;
-    t7.start();
-    cursor2.query(r);
-    t7.stop();
-    writeln("Time for Second DB Query: ",t7.elapsed());
-
-
-    var t8: Timer;
-    t8.start();
-    var dom1: domain(1) = {1..0},
-        dom2: domain(1) = {1..0},
-        indices: [dom1] (int, int),
-        values: [dom2] real;
-    t8.stop();
-    writeln("Time to Initialize Id/Val Arrays: ",t8.elapsed());
-
-    var t9: Timer;
-    t9.start();
-    for row in cursor2 {
-      indices.push_back((rows.get(row['source_cui']),rows.get(row['exhibited_cui'])));
-    }
-    t9.stop();
-    writeln("Time to Push Back on Indices: ",t9.elapsed());
-
-
-
     var t10: Timer;
     t10.start();
-    const size1 = cursor2.rowcount(): int;
+    cursor2.query(r);
     t10.stop();
-    writeln("Cursor Length Read Time: ",t10.elapsed());
+    writeln("Time for Second DB Query: ",t10.elapsed());
+
+
+
 
     var t11: Timer;
     t11.start();
+    const size1 = cursor2.rowcount(): int;
+    t11.stop();
+    writeln("Cursor Length Read Time: ",t11.elapsed());
+
+    var t12: Timer;
+    t12.start();
     var count = 0: int,
         dom = {1..size1},
         indices1: [dom] (int, int),
         values1: [dom] real;
-    t11.stop();
-    writeln("Index/Value Array Initialization Time: ",t11.elapsed());
-
-    var t12: Timer;
-    t12.start();
-    for row in cursor2 {
-      count += 1;
-      indices1[count]=(
-         rows.get(row['source_cui'])
-        ,rows.get(row['exhibited_cui'])
-        );
-      }
     t12.stop();
-    writeln("Time to Graft Indices: ",t12.elapsed());
+    writeln("Index/Value Array Initialization Time: ",t12.elapsed());
 
     var t13: Timer;
     t13.start();
-    SD.bulkAdd(indices1);
+    for row in cursor2 {
+      count += 1;
+      indices1[count]=(
+         rows1.get(row['source_cui'])
+        ,rows1.get(row['exhibited_cui'])
+        );
+      }
     t13.stop();
-    writeln("Time to bulkAdd Indices (~10^6) to Sparse Domain: ",t13.elapsed());
+    writeln("Time to Graft Indices: ",t13.elapsed());
 
     var t14: Timer;
     t14.start();
-    for (i,j) in indices {
-      X(i,j) = 1;
-    }
+    nm.SD.bulkAdd(indices1);
     t14.stop();
-    writeln("Time to Graft Ones on to Base Matrix: ",t14.elapsed());
-
+    writeln("Time to bulkAdd Indices (~10^6) to Sparse Domain: ",t14.elapsed());
 
     var t15: Timer;
     t15.start();
+    for (i,j) in indices1 {
+      nm.X(i,j) = 1;
+    }
+    t15.stop();
+    writeln("Time to Graft Ones on to Base Matrix: ",t15.elapsed());
+
+    t16.stop();
+    writeln("Total Runtime: ",t16.elapsed());
+
+/*
+    var t16: Timer;
+    t16.start();
     var nm = new NamedMatrix(X=X);
     nm.rows = rows;
     nm.cols = rows;
-    t15.stop();
-    writeln("Promoting X to NamedMatrix: ",t15.elapsed());
-
+    t16.stop();
+    writeln("Promoting X to NamedMatrix: ",t16.elapsed());
+*/
 
     /*
     var t1: Timer;
