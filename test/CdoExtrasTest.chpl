@@ -25,8 +25,12 @@ class CdoExtrasTest : UnitTest {
     var edgeTable = "r.cui_confabulation",
         fromField = "source_cui",
         toField = "exhibited_cui";
-
+    var t: Timer;
+    t.start();
     var con = PgConnectionFactory(host=DB_HOST, user=DB_USER, database=DB_NAME, passwd=DB_PWD);
+    t.stop();
+    writeln("Time to Establish Connection to the DB: ",t.elapsed());
+    /*
     var t1: Timer;
     t1.start();
     var nm = NamedMatrixFromPGSquare(con=con, edgeTable=edgeTable, fromField=fromField
@@ -35,7 +39,7 @@ class CdoExtrasTest : UnitTest {
 
     writeln("Dimensions are: ",nm.D);
     writeln("Time Elapsed to Load Matrix: ",t1.elapsed());
-/*
+
     var g = new Graph(nm);
 
     var t2: Timer;

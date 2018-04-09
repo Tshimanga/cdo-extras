@@ -6,6 +6,7 @@ SRCDIR=src
 BINDIR=target
 MODULES=-M$(CDO_HOME)/src -M$(NUMSUCH_HOME)/src -M$(CHARCOAL_HOME)/src -M$(CHINGON_HOME)/src
 EXEC=cdoExtras
+DB_CREDS=../db_creds.txt
 
 default: all
 
@@ -17,5 +18,5 @@ run:
 
 run-test: test/CdoExtrasTest.chpl
 	$(CC) $(INCLUDES) $(LIBS) $(MODULES) -M$(SRCDIR) -o test/test $< ; \
-	./test/test -f test/db_creds.txt ; \
+	./test/test -f $(DB_CREDS) ; \
 	rm test/test

@@ -28,6 +28,18 @@ module CdoExtras {
   }
 }
 
+/*
+SELECT ftr, t
+FROM (
+  SELECT distinct(source_cui) AS ftr, 'r' AS t FROM r.cui_confabulation
+  UNION ALL
+  SELECT distinct(exhibited_cui) AS ftr, 'c' AS t FROM r.cui_confabulation
+) AS a
+GROUP BY ftr, t
+ORDER BY ftr, t ;
+*/
+
+
 proc NamedMatrixFromPGRectangular(con: Connection
   , edgeTable: string
   , fromField: string, toField: string, wField: string = "NONE") {
