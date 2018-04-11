@@ -26,49 +26,79 @@ class CdoExtrasTest : UnitTest {
         fromField = "source_cui",
         toField = "exhibited_cui";
 
-    var t16: Timer;
-    t16.start();
+    var con = PgConnectionFactory(host=DB_HOST, user=DB_USER, database=DB_NAME, passwd=DB_PWD);
 
     var t: Timer;
     t.start();
-    var con = PgConnectionFactory(host=DB_HOST, user=DB_USER, database=DB_NAME, passwd=DB_PWD);
-    t.stop();
-    writeln("Time to Establish Connection to the DB: ",t.elapsed());
-
     var nm = NamedMatrixFromPGSquare(con, edgeTable, fromField, toField, wField = "NONE");
-    t16.stop();
-    writeln("Domain of Named Matrix: ",nm.D);
-    writeln("Total Runtime: ",t16.elapsed());
+    t.stop();
+    writeln("Domain of Named Matrix: ",nm.SD.size);
+    writeln("Total Loadtime: ",t.elapsed());
+    writeln(max(1,3));
 
-/*
-    var t16: Timer;
-    t16.start();
-    var nm = new NamedMatrix(X=X);
-    nm.rows = rows;
-    nm.cols = rows;
-    t16.stop();
-    writeln("Promoting X to NamedMatrix: ",t16.elapsed());
-*/
-
-    /*
     var t1: Timer;
     t1.start();
-    var nm = NamedMatrixFromPGSquare(con=con, edgeTable=edgeTable, fromField=fromField
-      , toField=toField);
+    var prod = dot(nm.X,nm.X);
     t1.stop();
+    writeln("Time to Compute Ben's Dot Product: ",t1.elapsed());
 
-    writeln("Dimensions are: ",nm.D);
-    writeln("Time Elapsed to Load Matrix: ",t1.elapsed());
+    var idom: domain(1) = {nm.X.domain.dim(1)};
+    var is: sparse subdomain(idom);
+    var t2: Timer;
+    t2.start();
+    for (i,k) in nm.X.domain {
+      if ! is.member(i) {
+        is += i;
+      }
+    }
+    t2.stop();
+    writeln("Length of i's: ",is.size);
+    writeln("Time to Pick Off i's: ",t2.elapsed());
 
+    var jdom: domain(1) = {nm.X.domain.dim(2)};
+    var js: sparse subdomain(jdom);
+    var t3: Timer;
+    t3.start();
+    for (k,j) in nm.X.domain {
+      if ! js.member(j) {
+        js += j;
+      }
+    }
+    t3.stop();
+    writeln("Length of j's: ",js.size);
+    writeln("Time to Pick Off j's: ",t3.elapsed());
+
+
+    var t4: Timer;
+    t4.start();
+    var I = identityMat(140000: int);
+    t4.stop();
+    writeln("Time to Generate 140000 by 140000 Id Mat: ",t4.elapsed());
+/*
+
+    var t1: Timer;
+    t1.start();
     var g = new Graph(nm);
+    t1.stop();
+    writeln("Time to Create Graph from NamedMatrix: ",t1.elapsed());
+    writeln("Graph is directed? ",g.directed);
+    writeln("Size of Sparse Domain (should be ~10^6): ",g.X.domain.size);
+    writeln("Number of Vertices (should be ~10^5): ",g.verts.size());
+
 
     var t2: Timer;
-
     t2.start();
     g.intoxicate();
     t2.stop();
 
     writeln("Time to Intoxicate: ",t2.elapsed());
+    var s2 = true;
+    for (i,j) in g.X.domain {
+      s2 &&= (i,j) == (j,i);
+    }
+    writeln(! s2);
+
+
 
     var t3: Timer;
     t3.start();
@@ -76,14 +106,16 @@ class CdoExtrasTest : UnitTest {
     t3.stop();
 
     writeln("Time to Compute all Distances: ", t3.elapsed());
+    var diam = max reduce distM;
+    writeln("Diameter: ",diam);
 
     var t4: Timer;
     t4.start();
     var diameter = aMax(distM, axis = 0);
     t4.stop();
-
     writeln("Diameter: ", diameter);
     writeln("Time to Extract Diameter: ",t4.elapsed());
+
 
     var t5: Timer;
     t5.start();

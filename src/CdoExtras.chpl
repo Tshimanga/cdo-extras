@@ -125,9 +125,6 @@ proc NamedMatrixFromPGRectangular(con: Connection
   return nm;
 }
 
-
-
-
 proc NamedMatrixFromPGSquare(con: Connection
   , edgeTable: string
   , fromField: string, toField: string, wField: string = "NONE") {
@@ -205,6 +202,8 @@ proc NamedMatrixFromPGSquare(con: Connection
 
   return nm;
 }
+
+
 
 
   /*
