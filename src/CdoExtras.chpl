@@ -125,6 +125,8 @@ proc NamedMatrixFromPGRectangular(con: Connection
   return nm;
 }
 
+
+
 proc NamedMatrixFromPGSquare(con: Connection
   , edgeTable: string
   , fromField: string, toField: string, wField: string = "NONE") {
@@ -307,8 +309,114 @@ proc NamedMatrixFromPGSquare(con: Connection
     return vertexNames;
   }
 
+
+   proc persistNamedMatrix(con: Connection, batchsize: int, aTable: string, fromField: string, toField: string, wField: string, N: NamedMatrix) {
+     var q: string;
+     if wField == "NONE" {
+       q = "INSERT INTO %s (%s, %s) VALUES ('%s', '%s');";
+       var cur = con.cursor();
+       var count: int = 0;
+       var dom: domain(1) = {1..0};
+       var ts: [dom] (string, string, string, string, string);
+       for (i,j) in N.SD {
+         var t: Timer;
+         t.start();
+         ts.push_back((aTable: string, fromField: string, toField: string, N.rows.get(i): string, N.cols.get(j): string));
+         count += 1;
+         if count >= batchsize {
+           cur.execute(q,ts);
+           count = 0;
+           var reset: [dom] (string, string, string, string, string);
+           ts = reset;
+           t.stop();
+           writeln("Batch Time: ",t.elapsed());
+         }
+       }
+       cur.execute(q,ts);
+     } else {
+       q = "INSERT INTO %s (%s, %s, %s) VALUES ('%s', '%s', %s);";
+       var cur = con.cursor();
+       var count: int = 0;
+       var dom: domain(1) = {1..0};
+       var ts: [dom] (string, string, string, string, string, string, real);
+       for (i,j) in N.SD {
+         var t: Timer;
+         var t1: Timer;
+         t.start();
+         t1.start();
+         ts.push_back((aTable: string, fromField: string, toField: string, wField: string, N.rows.get(i): string, N.cols.get(j): string, N.get(i,j): real));
+         count += 1;
+         t1.stop();
+         writeln("Time to Push Back on Buffer: ",t1.elapsed());
+         if count >= batchsize {
+           var t2: Timer;
+           t2.start();
+           cur.execute(q,ts);
+           count = 0;
+           var reset: [dom] (string, string, string, string, string, string, real);
+           ts = reset;
+           t2.stop();
+           t.stop();
+           writeln("Batch Execution Time: ",t2.elapsed());
+           writeln("Batch Time Total: ",t.elapsed());
+         }
+       }
+       cur.execute(q,ts);
+     }
+   }
+
+   proc persistNamedMatrixP(con: Connection, aTable: string
+     , fromField: string, toField: string, wField: string
+     , N: NamedMatrix) {
+     var q: string;
+     if wField == "NONE" {
+       q = "INSERT INTO %s (%s, %s) VALUES ('%s', '%s');";
+       var cur = con.cursor();
+       forall (i,j) in N.SD {
+         var d: domain(1) = {1..0};
+         var t: [d] (string, string, string, string, string);
+         t.push_back((aTable: string, fromField: string, toField: string, N.rows.get(i): string, N.cols.get(j): string));
+         cur.execute(q, t);
+      }
+     } else {
+       q = "INSERT INTO %s (%s, %s, %s) VALUES ('%s', '%s', %s);";
+       var cur = con.cursor();
+       forall (i,j) in N.SD {
+         var t1: Timer;
+         var t2: Timer;
+         var t3: Timer;
+         var t4: Timer;
+         var t5: Timer;
+         t1.start();
+         t2.start();
+         var d: domain(1) = {1..0};
+         t2.stop();
+         t3.start();
+         var t: [d] (string, string, string, string, string, string, real);
+//         var t: [d] (string, string, string, string, int, int, real);
+         t3.stop();
+         t4.start();
+         t.push_back((aTable: string, fromField: string, toField: string, wField: string, N.rows.get(i): string, N.cols.get(j): string, N.get(i,j): real));
+  //       t.push_back((aTable: string, fromField: string, toField: string, wField: string, i: int, j: int, N.X(i,j): real));
+         t4.stop();
+         t5.start();
+         cur.execute(q, t);
+         t5.stop();
+         t1.stop();
+         writeln("------------------");
+         writeln("Defining d: ",t2.elapsed());
+         writeln("Defining t: ",t3.elapsed());
+         writeln("Push Back Time: ",t4.elapsed());
+         writeln("Execute Time: ",t5.elapsed());
+         writeln("Loop Time: ",t1.elapsed());
+         writeln("------------------");
+      }
+     }
+   }
+
+
   // BATCH PERSISTENCE
-   proc persistSparseMatrix(con: Connection, aTable: string
+   proc persistSparseMatrix(con: Connection, batchsize: int, aTable: string
      , fromField: string, toField: string, weightField: string
      , X:[?D] real) {
      const q = "INSERT INTO %s (%s, %s, %s) VALUES (%s, %s, %s);";
@@ -317,6 +425,8 @@ proc NamedMatrixFromPGSquare(con: Connection
      var dom: domain(1, int, false) = {1..0};
      var ts: [dom] (string, string, string, string, int, int, real);
      for ij in X.domain {
+       var t: Timer;
+       t.start();
        ts.push_back((aTable, fromField, toField, weightField, ij(1), ij(2), X(ij)));
        count += 1;
        if count >= batchsize {
@@ -324,6 +434,8 @@ proc NamedMatrixFromPGSquare(con: Connection
          count = 0;
          var reset: [dom] (string, string, string, string, int, int, real);
          ts = reset;
+         t.stop();
+         writeln("Batch Time: ",t.elapsed());
        }
      }
      cur.execute(q,ts);
