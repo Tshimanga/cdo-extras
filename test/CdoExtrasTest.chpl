@@ -89,7 +89,7 @@ class CdoExtrasTest : UnitTest {
 
     var t2: Timer;
     t2.start();
-    var siblingMatrix = buildCUIMatrixWithRelType(con, 'SIB');
+    var siblingMatrix = buildCUIMatrixWithRelType_BATCHED(con, 100000, 'SIB');
     t2.stop();
     writeln("Dimensions of Sibling Matrix: ", siblingMatrix.D);
     writeln("Number of Edges: ",siblingMatrix.SD.size);
@@ -155,8 +155,8 @@ class CdoExtrasTest : UnitTest {
   //  testPersistNamedMatrix();
   //  testPingPostgres();
   //  testBuildNamedMatrix();
-    testParBuilder();
-  //  testSibBuilder();
+  //  testParBuilder();
+    testSibBuilder();
 
     return 0;
   }

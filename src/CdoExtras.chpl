@@ -410,6 +410,60 @@ proc buildCUIMatrixWithRelType_(con: Connection, relType: string) {
   // RETURN FINISHED MATRIX
   return namedMatrix;
 }
+
+proc buildCUIMatrixWithRelType_BATCHED(con: Connection, batchsize: int, relType: string) {
+  // MAKING SURE THE DOMAIN COVERS ALL CUIs
+  var q = """
+  SELECT node
+  FROM (
+    SELECT distinct(cui1) AS node FROM a.umls_parsib_rel
+    UNION ALL
+    SELECT distinct(cui2) AS node FROM a.umls_parsib_rel
+  ) AS a
+  GROUP BY node ORDER BY node;
+  """;
+
+  // PREPARE NAMEDMATRIX
+  var namedMatrix = prepareNamedBase(con: Connection, q);
+
+  // BATCHING DETAILS
+  var qNumRows = """
+  SELECT *
+  FROM a.umls_parsib_rel s
+  WHERE s.rel='%s'
+  """;
+  try! qNumRows.format(relType);
+  var numRowCursor = con.cursor();
+  numRowCursor.query(q);
+  var numRows = numRowCursor.rowcount();
+  delete numRowCursor;
+  var batches = ((numRows/batchsize) + 1): int;
+  var count = 0: int;
+
+  for n in batches {
+    var r = """
+    SELECT cui1, cui2
+    FROM (
+      SELECT * FROM a.umls_parsib_rel s WHERE s.rel='%s'
+      ) AS edges
+    ORDER BY cui1, cui2
+    LIMIT %s
+    OFFSET %s;
+    """;
+    var params: (string, int, int) = (relType, batchsize, count*batchsize);
+    try! r.format(params);
+
+    namedMatrix.expandSparseDomain(con: Connection, r);
+  }
+  
+  // POPULATE ENTRIES IN EDGE SET
+  forall (i,j) in namedMatrix.SD {
+    namedMatrix.X(i,j) = 1;
+  }
+
+  // RETURN FINISHED MATRIX
+  return namedMatrix;
+}
   /*
 
     :arg con: A CDO Connection to Postgres
