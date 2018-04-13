@@ -40,27 +40,60 @@ class CdoExtrasTest : UnitTest {
     writeln("testBuildNamedMatrix... done...");
   }
 
-  proc testSibParBuilder() {
+  proc testParBuilder() {
+    // CONNECT TO DB
     var con = PgConnectionFactory(host=DB_HOST, user=DB_USER, database=DB_NAME, passwd=DB_PWD);
 
+    //LOADING PARENT MATRIX
     var t1: Timer;
     t1.start();
-    var siblingMatrix = buildCUIMatrixWithRelType(con, 'SIB');
-    t1.stop();
-    writeln("Dimensions of Sibling Matrix: ", siblingMatrix.D);
-    writeln("Number of Edges: ",siblingMatrix.SD.size);
-    writeln("Total Loadtime: ",t1.elapsed());
-
-    var t2: Timer;
-    t2.start();
     var parentMatrix = buildCUIMatrixWithRelType(con, 'PAR');
-    t2.stop();
+    t1.stop();
     writeln("Dimensions of Parent Matrix: ", parentMatrix.D);
     writeln("Number of Edges: ",parentMatrix.SD.size);
+    writeln("Total Loadtime: ",t1.elapsed());
+
+    var aTable = 'a.umls_par_rel',
+        fromField = 'cui1',
+        toField = 'cui2',
+        wField = 'w';
+
+    //PREPARING POSTGRES
+    var q = """
+    DROP TABLE IF EXISTS %s;
+    CREATE TABLE %s (%s varchar NOT NULL, %s varchar NOT NULL, %s float NOT NULL);
+    """;
+    var b: Timer;
+    b.start();
+    var cursor = con.cursor();
+    cursor.execute(q,(aTable, aTable, fromField, toField, wField));
+    b.stop();
+    writeln("Time to Prepare Postgres: ",b.elapsed());
+
+    //PERSISTING PARENT MATRIX
+    var t1: Timer;
+    t1.start();
+    persistNamedMatrixP(con, aTable, fromField, toField, wField, nm);
+  //  persistSparseMatrix(con, 1000, aTable, fromField2, toField2, wField, nm.X);
+    t1.stop();
+    writeln("Time to Persist PAR: ",t1.elapsed());
+
+    writeln("");
+    writeln("testParBuilder... done...");
+  }
+
+
+  proc testSibBuilder() {
+    var t2: Timer;
+    t2.start();
+    var siblingMatrix = buildCUIMatrixWithRelType(con, 'SIB');
+    t2.stop();
+    writeln("Dimensions of Sibling Matrix: ", siblingMatrix.D);
+    writeln("Number of Edges: ",siblingMatrix.SD.size);
     writeln("Total Loadtime: ",t2.elapsed());
 
     writeln("");
-    writeln("testSibParBuilder... done...");
+    writeln("testSibBuilder... done...");
   }
 
   proc testPersistNamedMatrix() {
@@ -119,7 +152,8 @@ class CdoExtrasTest : UnitTest {
   //  testPersistNamedMatrix();
   //  testPingPostgres();
   //  testBuildNamedMatrix();
-    testSibParBuilder();
+    testParBuilder();
+  //  testSibBuilder();
 
     return 0;
   }

@@ -193,11 +193,11 @@ proc NamedMatrixFromPGSquare(con: Connection
     nm.SD.bulkAdd(indices);
 
     if wField == "NONE" {
-      for (i,j) in indices {
+      forall (i,j) in indices {
           nm.X(i,j) = 1;
       }
     } else if wField != "NONE" {
-      for (ij, a) in zip(indices, values) {
+      forall (ij, a) in zip(indices, values) {
         nm.X(ij) = a;
       }
     }
