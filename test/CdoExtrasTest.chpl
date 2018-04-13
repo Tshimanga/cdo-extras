@@ -47,12 +47,12 @@ class CdoExtrasTest : UnitTest {
     //LOADING PARENT MATRIX
     var t1: Timer;
     t1.start();
-    var parentMatrix = buildCUIMatrixWithRelType(con, 'PAR');
+    var parentMatrix = buildCUIMatrixWithRelType_(con, 'PAR');
     t1.stop();
     writeln("Dimensions of Parent Matrix: ", parentMatrix.D);
     writeln("Number of Edges: ",parentMatrix.SD.size);
     writeln("Total Loadtime: ",t1.elapsed());
-
+/*
     var aTable = 'a.umls_par_rel',
         fromField = 'cui1',
         toField = 'cui2',
@@ -77,7 +77,7 @@ class CdoExtrasTest : UnitTest {
   //  persistSparseMatrix(con, 1000, aTable, fromField2, toField2, wField, parentMatrix.X);
     t2.stop();
     writeln("Time to Persist PAR: ",t2.elapsed());
-
+*/
     writeln("");
     writeln("testParBuilder... done...");
   }

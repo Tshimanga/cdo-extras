@@ -246,14 +246,13 @@ proc buildCUIMatrixWithRelType(con: Connection, relType: string) {
   t3.stop();
   writeln("Time to Prepare Named Matrix: ",t3.elapsed());
 
-
-  var edgeCursor = con.cursor();
-
   var r = """
   SELECT cui1, cui2
-  FROM (SELECT * FROM a.umls_parsib_rel s WHERE s.rel=%s) AS edges
+  FROM (SELECT * FROM a.umls_parsib_rel s WHERE s.rel='%s') AS edges
   ORDER BY cui1, cui2;
   """;
+
+  var edgeCursor = con.cursor();
 
   var t4: Timer;
   t4.start();
@@ -301,8 +300,116 @@ proc buildCUIMatrixWithRelType(con: Connection, relType: string) {
   return nm;
 }
 
+proc prepareNamedBase(con: Connection, q: string) {
+  var t1: Timer;
+  t1.start();
+  var vertexCursor = con.cursor();
+  vertexCursor.query(q);
+  t1.stop();
+  writeln("Time to Pull Vertex Data: ", t1.elapsed());
 
 
+  var t2: Timer;
+  t2.start();
+  var vertices: BiMap = new BiMap;
+  for row in vertexCursor {
+    vertices.add(row['node']);
+  }
+  t2.stop();
+  writeln("Time to Build Vertex Set: ",t2.elapsed());
+
+  var t3: Timer;
+  t3.start();
+  var size: int = vertices.size();
+  var D: domain(2) = {1..size,1..size},
+      SD = CSRDomain(D),
+      X: [SD] real;
+  var nm = new NamedMatrix(X=X);
+  nm.rows = vertices;
+  nm.cols = vertices;
+  delete vertexCursor;
+  delete vertices;
+  t3.stop();
+  writeln("Time to Prepare Named Matrix: ",t3.elapsed());
+
+  return nm;
+}
+
+
+proc NamedMatrix.expandSparseDomain(con: Connection, q: string) {
+  var edgeCursor = con.cursor();
+
+  var t4: Timer;
+  t4.start();
+  try! edgeCursor.query(q); // Pull Edges with relType
+  t4.stop();
+  writeln("Time to Pull Edge Data: ",t4.elapsed());
+
+  var t5: Timer;
+  t5.start();
+  var size = edgeCursor.rowcount(): int;
+  var count = 0: int,
+      dom = {1..size},
+      indices: [dom] (int, int);
+  t5.stop();
+  writeln("Time to Initialize Index Buffer: ",t5.elapsed());
+
+
+  var t6: Timer;
+  t6.start();
+  for edge in edgeCursor {
+    count += 1;
+    indices[count]=(
+      this.rows.get(edge['cui1'])
+     ,this.cols.get(edge['cui2'])
+     );
+  }
+  t6.stop();
+  writeln("Time to Graft Indices: ",t6.elapsed());
+
+  delete edgeCursor;
+
+  var t7: Timer;
+  t7.start();
+  this.SD.bulkAdd(indices);  // Expand Sparse Domain in Bulk
+  t7.stop();
+  writeln("Time to bulkAdd to Sparse Domain: ",t7.elapsed());
+}
+
+proc buildCUIMatrixWithRelType_(con: Connection, relType: string) {
+  // MAKING SURE THE DOMAIN COVERS ALL CUIs
+  var q = """
+  SELECT node
+  FROM (
+    SELECT distinct(cui1) AS node FROM a.umls_parsib_rel
+    UNION ALL
+    SELECT distinct(cui2) AS node FROM a.umls_parsib_rel
+  ) AS a
+  GROUP BY node ORDER BY node;
+  """;
+
+  // PREPARE NAMEDMATRIX
+  var namedMatrix = prepareNamedBase(con: Connection, q);
+
+  // CHOOSE THE RELATIONSHIP TYPE (sibling or parent)
+  var r = """
+  SELECT cui1, cui2
+  FROM (SELECT * FROM a.umls_parsib_rel s WHERE s.rel='%s') AS edges
+  ORDER BY cui1, cui2;
+  """;
+  try! r.format(relType);
+
+  // EXPAND NAMEDMATRIX EDGE SET/SPARSE DOMAIN
+  namedMatrix.expandSparseDomain(con: Connection, r);
+
+  // POPULATE ENTRIES IN EDGE SET
+  forall (i,j) in namedMatrix.SD {
+    namedMatrix.X(i,j) = 1;
+  }
+
+  // RETURN FINISHED MATRIX
+  return namedMatrix;
+}
   /*
 
     :arg con: A CDO Connection to Postgres
