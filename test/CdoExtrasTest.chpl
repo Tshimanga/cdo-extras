@@ -71,12 +71,12 @@ class CdoExtrasTest : UnitTest {
     writeln("Time to Prepare Postgres: ",b.elapsed());
 
     //PERSISTING PARENT MATRIX
-    var t1: Timer;
-    t1.start();
-    persistNamedMatrixP(con, aTable, fromField, toField, wField, nm);
-  //  persistSparseMatrix(con, 1000, aTable, fromField2, toField2, wField, nm.X);
-    t1.stop();
-    writeln("Time to Persist PAR: ",t1.elapsed());
+    var t2: Timer;
+    t2.start();
+    persistNamedMatrixP(con, aTable, fromField, toField, wField, parentMatrix);
+  //  persistSparseMatrix(con, 1000, aTable, fromField2, toField2, wField, parentMatrix.X);
+    t2.stop();
+    writeln("Time to Persist PAR: ",t2.elapsed());
 
     writeln("");
     writeln("testParBuilder... done...");
@@ -84,6 +84,9 @@ class CdoExtrasTest : UnitTest {
 
 
   proc testSibBuilder() {
+    // CONNECT TO DB
+    var con = PgConnectionFactory(host=DB_HOST, user=DB_USER, database=DB_NAME, passwd=DB_PWD);
+
     var t2: Timer;
     t2.start();
     var siblingMatrix = buildCUIMatrixWithRelType(con, 'SIB');
