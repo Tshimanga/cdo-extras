@@ -36,7 +36,31 @@ class CdoExtrasTest : UnitTest {
     writeln("Number of Nonzeros: ",nm.SD.size);
     writeln("Total Loadtime: ",t.elapsed());
 
+    writeln("");
     writeln("testBuildNamedMatrix... done...");
+  }
+
+  proc testSibParBuilder() {
+    var con = PgConnectionFactory(host=DB_HOST, user=DB_USER, database=DB_NAME, passwd=DB_PWD);
+
+    var t1: Timer;
+    t1.start();
+    var siblingMatrix = buildCUIMatrixWithRelType(con, 'SIB');
+    t1.stop();
+    writeln("Dimensions of Sibling Matrix: ", siblingMatrix.D);
+    writeln("Number of Edges: ",siblingMatrix.SD.size);
+    writeln("Total Loadtime: ",t1.elapsed());
+
+    var t2: Timer;
+    t2.start();
+    var parentMatrix = buildCUIMatrixWithRelType(con, 'PAR');
+    t2.stop();
+    writeln("Dimensions of Parent Matrix: ", parentMatrix.D);
+    writeln("Number of Edges: ",parentMatrix.SD.size);
+    writeln("Total Loadtime: ",t2.elapsed());
+
+    writeln("");
+    writeln("testSibParBuilder... done...");
   }
 
   proc testPersistNamedMatrix() {
@@ -85,15 +109,17 @@ class CdoExtrasTest : UnitTest {
     t1.stop();
     writeln("Time to Persist the NamedMatrix: ",t1.elapsed());
 
+    writeln("");
     writeln("testPeristNamedMatrix... done... ");
   }
 
 
   proc run() {
     super.run();
-    testPersistNamedMatrix();
+  //  testPersistNamedMatrix();
   //  testPingPostgres();
   //  testBuildNamedMatrix();
+    testSibParBuilder();
 
     return 0;
   }

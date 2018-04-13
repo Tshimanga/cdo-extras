@@ -208,6 +208,101 @@ proc NamedMatrixFromPGSquare(con: Connection
 
 
 
+proc buildCUIMatrixWithRelType(con: Connection, relType: string) {
+  var q = """
+  SELECT ftr
+  FROM (
+    SELECT distinct(cui1) AS ftr FROM a.umls_parsib_rel
+    UNION ALL
+    SELECT distinct(cui2) AS ftr FROM a.umls_parsib_rel
+  ) AS a
+  GROUP BY ftr ORDER BY ftr;
+  """; // MAKING SURE THE DOMAIN COVERS ALL CUIs
+  var t1: Timer;
+  t1.start();
+  var vertexCursor = con.cursor();
+  vertexCursor.query(q);
+  t1.stop();
+  writeln("Time to Pull Vertex Data: ", t1.elapsed());
+
+
+  var t2: Timer;
+  t2.start();
+  var vertices: BiMap = new BiMap;
+  for row in vertexCursor {
+    vertices.add(row['ftr']);
+  }
+  t2.stop();
+  writeln("Time to Build Vertex Set: ",t2.elapsed());
+
+  var t3: Timer;
+  t3.start();
+  var D: domain(2) = {1..vertices.size(),1..vertices.size()},
+      SD = CSRDomain(D),
+      X: [SD] real;
+  var nm = new NamedMatrix(X=X);
+  nm.rows = vertices;
+  nm.cols = vertices;
+  t3.stop();
+  writeln("Time to Prepare Named Matrix: ",t3.elapsed());
+
+
+  var edgeCursor = con.cursor();
+
+  var r = """
+  SELECT cui1, cui2
+  FROM (SELECT * FROM a.umls_parsib_rel s WHERE s.rel=%s) AS edges
+  ORDER BY cui1, cui2;
+  """;
+
+  var t4: Timer;
+  t4.start();
+  try! edgeCursor.query(r.format(relType)); // Pull Edges with relType
+  t4.stop();
+  writeln("Time to Pull Edge Data: ",t4.elapsed());
+
+  var t5: Timer;
+  t5.start();
+  var size = edgeCursor.rowcount(): int;
+  var count = 0: int,
+      dom = {1..size},
+      indices: [dom] (int, int);
+  t5.stop();
+  writeln("Time to Initialize Index Buffer: ",t5.elapsed());
+
+
+  var t6: Timer;
+  t6.start();
+  for edge in edgeCursor {
+    count += 1;
+    indices[count]=(
+      vertices.get(edge['cui1'])
+     ,vertices.get(edge['cui2'])
+     );
+  }
+  t6.stop();
+  writeln("Time to Graft Indices: ",t6.elapsed());
+
+
+  var t7: Timer;
+  t7.start();
+  nm.SD.bulkAdd(indices);  // Expand Sparse Domain in Bulk
+  t7.stop();
+  writeln("Time to bulkAdd to Sparse Domain: ",t7.elapsed());
+
+  var t8: Timer;
+  t8.start();
+  for (i,j) in indices {  // Populate Entries
+    nm.X(i,j) = 1;
+  }
+  t8.stop();
+  writeln("Time to Write to Array: ",t8.elapsed());
+
+  return nm;
+}
+
+
+
   /*
 
     :arg con: A CDO Connection to Postgres
