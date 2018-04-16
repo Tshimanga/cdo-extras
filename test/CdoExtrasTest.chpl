@@ -99,7 +99,7 @@ class CdoExtrasTest : UnitTest {
     writeln("testSibBuilder... done...");
   }
 
-  proc testPersistNamedMatrix() {
+  proc testPersistNamedMatrixParallel() {
     //DB CONNECTION
     var con = PgConnectionFactory(host=DB_HOST, user=DB_USER, database=DB_NAME, passwd=DB_PWD);
     //PULL TABLE
@@ -115,6 +115,8 @@ class CdoExtrasTest : UnitTest {
     writeln("Number of Nonzeros: ",nm.SD.size);
     writeln("Total Loadtime: ",t.elapsed());
 
+
+
     //PREPARE POSTGRES
     var aTable = 'r.cui_confabulation_copy',
         fromField2 = 'source_cui',
@@ -125,6 +127,8 @@ class CdoExtrasTest : UnitTest {
     DROP TABLE IF EXISTS %s;
     CREATE TABLE %s (%s varchar NOT NULL, %s varchar NOT NULL, %s float NOT NULL);
     """;
+
+
     /*
     var q = """
     DROP TABLE IF EXISTS %s;
@@ -137,10 +141,14 @@ class CdoExtrasTest : UnitTest {
     b.stop();
     writeln("Time to Prepare Postgres: ",b.elapsed());
 
+    con.close();
+
+
     //PERSIST MATRIX
+    var pcon = new PgParallelConnection(host=DB_HOST, user=DB_USER, database=DB_NAME, passwd=DB_PWD);
     var t1: Timer;
     t1.start();
-    persistNamedMatrixP(con, aTable, fromField2, toField2, wField, nm);
+    persistNamedMatrixP(pcon, aTable, fromField2, toField2, wField, nm);
   //  persistSparseMatrix(con, 1000, aTable, fromField2, toField2, wField, nm.X);
     t1.stop();
     writeln("Time to Persist the NamedMatrix: ",t1.elapsed());
@@ -152,11 +160,11 @@ class CdoExtrasTest : UnitTest {
 
   proc run() {
     super.run();
-  //  testPersistNamedMatrix();
+    testPersistNamedMatrixParallel();
   //  testPingPostgres();
   //  testBuildNamedMatrix();
   //  testParBuilder();
-    testSibBuilder();
+  //  testSibBuilder();
 
     return 0;
   }

@@ -233,6 +233,7 @@ proc buildCUIMatrixWithRelType(con: Connection, relType: string) {
     vertices.add(row['ftr']);
   }
   t2.stop();
+  delete vertexCursor;
   writeln("Time to Build Vertex Set: ",t2.elapsed());
 
   var t3: Timer;
@@ -280,6 +281,7 @@ proc buildCUIMatrixWithRelType(con: Connection, relType: string) {
      );
   }
   t6.stop();
+  delete edgeCursor;
   writeln("Time to Graft Indices: ",t6.elapsed());
 
 
@@ -403,9 +405,12 @@ proc buildCUIMatrixWithRelType_(con: Connection, relType: string) {
   namedMatrix.expandSparseDomain(con: Connection, r);
 
   // POPULATE ENTRIES IN EDGE SET
+  var t: Timer;
+  t.start();
   forall (i,j) in namedMatrix.SD {
     namedMatrix.X(i,j) = 1;
   }
+  t.stop();
 
   // RETURN FINISHED MATRIX
   return namedMatrix;
@@ -430,7 +435,7 @@ proc buildCUIMatrixWithRelType_BATCHED(con: Connection, batchsize: int, relType:
   var qNumRows = """
   SELECT *
   FROM a.umls_parsib_rel s
-  WHERE s.rel='%s'
+  WHERE s.rel='%s';
   """;
   try! qNumRows.format(relType);
   var numRowCursor = con.cursor();
@@ -628,42 +633,42 @@ proc buildCUIMatrixWithRelType_BATCHED(con: Connection, batchsize: int, relType:
      }
    }
 
-   proc persistNamedMatrixP(con: Connection, aTable: string
+   proc persistNamedMatrixP(pcon, aTable: string
      , fromField: string, toField: string, wField: string
      , N: NamedMatrix) {
      var q: string;
      if wField == "NONE" {
        q = "INSERT INTO %s (%s, %s) VALUES ('%s', '%s');";
-       var cur = con.cursor();
+//       var cur = con.cursor();
        forall (i,j) in N.SD {
          var d: domain(1) = {1..0};
          var t: [d] (string, string, string, string, string);
          t.push_back((aTable: string, fromField: string, toField: string, N.rows.get(i): string, N.cols.get(j): string));
-         cur.execute(q, t);
+         pcon.execute(q, t);
       }
      } else {
        q = "INSERT INTO %s (%s, %s, %s) VALUES ('%s', '%s', %s);";
-       var cur = con.cursor();
-       forall (i,j) in N.SD {
+  //     var cur = con.cursor();
+       forall (i,j) in N.SD {/*
          var t1: Timer;
          var t2: Timer;
          var t3: Timer;
          var t4: Timer;
          var t5: Timer;
          t1.start();
-         t2.start();
+         t2.start();*/
          var d: domain(1) = {1..0};
-         t2.stop();
-         t3.start();
+//         t2.stop();
+//         t3.start();
          var t: [d] (string, string, string, string, string, string, real);
 //         var t: [d] (string, string, string, string, int, int, real);
-         t3.stop();
-         t4.start();
+//         t3.stop();
+//         t4.start();
          t.push_back((aTable: string, fromField: string, toField: string, wField: string, N.rows.get(i): string, N.cols.get(j): string, N.get(i,j): real));
   //       t.push_back((aTable: string, fromField: string, toField: string, wField: string, i: int, j: int, N.X(i,j): real));
-         t4.stop();
-         t5.start();
-         cur.execute(q, t);
+//         t4.stop();
+//         t5.start();
+         pcon.execute(q, t);/*
          t5.stop();
          t1.stop();
          writeln("------------------");
@@ -672,7 +677,7 @@ proc buildCUIMatrixWithRelType_BATCHED(con: Connection, batchsize: int, relType:
          writeln("Push Back Time: ",t4.elapsed());
          writeln("Execute Time: ",t5.elapsed());
          writeln("Loop Time: ",t1.elapsed());
-         writeln("------------------");
+         writeln("------------------");*/
       }
      }
    }
