@@ -148,7 +148,7 @@ class CdoExtrasTest : UnitTest {
     var pcon = new PgParallelConnection(host=DB_HOST, user=DB_USER, database=DB_NAME, passwd=DB_PWD);
     var t1: Timer;
     t1.start();
-    persistNamedMatrixP(pcon, aTable, fromField2, toField2, wField, nm);
+    persistNamedMatrixPB(pcon, 800000, aTable, fromField2, toField2, wField, nm);
   //  persistSparseMatrix(con, 1000, aTable, fromField2, toField2, wField, nm.X);
     t1.stop();
     writeln("Time to Persist the NamedMatrix: ",t1.elapsed());

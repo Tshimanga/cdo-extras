@@ -633,6 +633,65 @@ proc buildCUIMatrixWithRelType_BATCHED(con: Connection, batchsize: int, relType:
      }
    }
 
+
+
+
+   proc persistNamedMatrixPB(pcon, batchsize: int, aTable: string, fromField: string, toField: string, wField: string, N: NamedMatrix) {
+     var q: string;
+     if wField == "NONE" {
+       q = "INSERT INTO %s (%s, %s) VALUES ('%s', '%s');";
+  //     var cur = con.cursor();
+       var count: int = 0;
+       var dom: domain(1) = {1..0};
+       var ts: [dom] (string, string, string, string, string);
+       for (i,j) in N.SD {
+         var t: Timer;
+         t.start();
+         ts.push_back((aTable: string, fromField: string, toField: string, N.rows.get(i): string, N.cols.get(j): string));
+         count += 1;
+         if count >= batchsize {
+           pcon.execute(q,ts);
+           count = 0;
+           var reset: [dom] (string, string, string, string, string);
+           ts = reset;
+           t.stop();
+           writeln("Batch Time: ",t.elapsed());
+         }
+       }
+       pcon.execute(q,ts);
+     } else {
+       q = "INSERT INTO %s (%s, %s, %s) VALUES ('%s', '%s', %s);";
+//       var cur = con.cursor();
+       var count: int = 0;
+       var dom: domain(1) = {1..0};
+       var ts: [dom] (string, string, string, string, string, string, real);
+       for (i,j) in N.SD {
+         var t: Timer;
+         var t1: Timer;
+         t.start();
+         t1.start();
+         ts.push_back((aTable: string, fromField: string, toField: string, wField: string, N.rows.get(i): string, N.cols.get(j): string, N.get(i,j): real));
+         count += 1;
+         t1.stop();
+         writeln("Time to Push Back on Buffer: ",t1.elapsed());
+         if count >= batchsize {
+           var t2: Timer;
+           t2.start();
+           pcon.execute(q,ts);
+           count = 0;
+           var reset: [dom] (string, string, string, string, string, string, real);
+           ts = reset;
+           t2.stop();
+           t.stop();
+           writeln("Batch Execution Time: ",t2.elapsed());
+           writeln("Batch Time Total: ",t.elapsed());
+         }
+       }
+       pcon.execute(q,ts);
+     }
+   }
+
+
    proc persistNamedMatrixP(pcon, aTable: string
      , fromField: string, toField: string, wField: string
      , N: NamedMatrix) {
