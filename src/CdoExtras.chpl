@@ -440,7 +440,7 @@ proc buildCUIMatrixWithRelType_BATCHED(con: Connection, batchsize: int, relType:
   var batches = ((numRows/batchsize) + 1): int;
   var count = 0: int;
 
-  for n in batches {
+  for n in {1..batches} {
     var r = """
     SELECT cui1, cui2
     FROM (
@@ -450,12 +450,19 @@ proc buildCUIMatrixWithRelType_BATCHED(con: Connection, batchsize: int, relType:
     LIMIT %s
     OFFSET %s;
     """;
-    var params: (string, int, int) = (relType, batchsize, count*batchsize);
-    try! r.format(params);
+    var offset = count*batchsize: int;
+//    var params: (string, int, int) = (relType, batchsize, count*batchsize);
+//    try! r.format(relType, batchsize, offset);
+    try{
+      r.format(relType, batchsize, offset);
+      }catch(e:Error) {
+         writeln(e);
+      }
 
     namedMatrix.expandSparseDomain(con: Connection, r);
+    count += 1;
   }
-  
+
   // POPULATE ENTRIES IN EDGE SET
   forall (i,j) in namedMatrix.SD {
     namedMatrix.X(i,j) = 1;
