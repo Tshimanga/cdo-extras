@@ -71,6 +71,8 @@ class CdoExtrasTest : UnitTest {
 
     writeln("");
     writeln("testBuildNamedMatrix... done...");
+    writeln("");
+    writeln("");
   }
 
 
