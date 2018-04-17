@@ -757,7 +757,20 @@ proc buildCUIMatrixWithRelType_BATCHED(con: Connection, batchsize: int, relType:
      }
    }
 
-
+  proc persistNMParallelConn(pcon, aTable: string, fromField: string, toField: string, wField: string, N: NamedMatrix) {
+    var q = "INSERT INTO %s (%s, %s, %s) VALUES ('%s', '%s', %s)";
+    var count: int = 0;
+    var dom: domain(1) = {1..0};
+    var data: [dom] (string, string, string, string, string, string, real);
+    var t: Timer;
+    t.start();
+    for (i,j) in N.SD {
+      data.push_back((aTable, fromField, toField, N.rows.get(i),, N.cols.get(j), N.get(i,j)));
+    }
+    t.stop();
+    writeln("Time Prepare Data Array: ",t.elapsed());
+    pcon.execute(q,data);
+  }
 
 
    proc persistNamedMatrixPB(pcon, batchsize: int, aTable: string, fromField: string, toField: string, wField: string, N: NamedMatrix) {
@@ -769,17 +782,17 @@ proc buildCUIMatrixWithRelType_BATCHED(con: Connection, batchsize: int, relType:
        var dom: domain(1) = {1..0};
        var ts: [dom] (string, string, string, string, string);
        for (i,j) in N.SD {
-//         var t: Timer;
-  //       t.start();
+         var t: Timer;
+         t.start();
          ts.push_back((aTable: string, fromField: string, toField: string, N.rows.get(i): string, N.cols.get(j): string));
          count += 1;
          if count >= batchsize {
-  //         pcon.execute(q,ts);
+           pcon.execute(q,ts);
            count = 0;
            var reset: [dom] (string, string, string, string, string);
            ts = reset;
-//           t.stop();
-//           writeln("Batch Time: ",t.elapsed());
+           t.stop();
+           writeln("Batch Time: ",t.elapsed());
          }
        }
        pcon.execute(q,ts);

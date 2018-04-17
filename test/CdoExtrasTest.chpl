@@ -62,6 +62,7 @@ class CdoExtrasTest : UnitTest {
 
     var t: Timer;
     t.start();
+    // NamedMatrixFromPGSquare_ is the verbose version of the procedure
     var nm = NamedMatrixFromPGSquare_(con, edgeTable, fromField, toField, wField = "NONE");
     t.stop();
     writeln("Dimensions: ", nm.D);
@@ -86,6 +87,8 @@ class CdoExtrasTest : UnitTest {
 
 
   proc testPersistNamedMatrix() {
+    writeln("testingPersistNamedMatrix... starting...");
+    writeln("");
     //DB CONNECTION
     var con = PgConnectionFactory(host=DB_HOST, user=DB_USER, database=DB_NAME, passwd=DB_PWD);
     //PULL TABLE
@@ -100,7 +103,7 @@ class CdoExtrasTest : UnitTest {
     writeln("Dimensions: ", nm.D);
     writeln("Number of Nonzeros: ",nm.SD.size);
     writeln("Total Loadtime: ",t.elapsed());
-/*
+
     //PREPARE POSTGRES
     var aTable = 'r.cui_confabulation_copy',
         fromField2 = 'source_cui',
@@ -111,11 +114,7 @@ class CdoExtrasTest : UnitTest {
     DROP TABLE IF EXISTS %s;
     CREATE TABLE %s (%s varchar NOT NULL, %s varchar NOT NULL, %s float NOT NULL);
     """;
-    /*
-    var q = """
-    DROP TABLE IF EXISTS %s;
-    CREATE TABLE %s (%s int NOT NULL, %s int NOT NULL, %s float NOT NULL);
-    """;*/
+
     var b: Timer;
     b.start();
     var cursor = con.cursor();
@@ -130,9 +129,77 @@ class CdoExtrasTest : UnitTest {
   //  persistSparseMatrix(con, 1000, aTable, fromField2, toField2, wField, nm.X);
     t1.stop();
     writeln("Time to Persist the NamedMatrix: ",t1.elapsed());
-*/
+
     writeln("");
     writeln("testPeristNamedMatrix... done... ");
+    writeln("");
+    writeln("");
+  }
+
+
+
+
+//
+//
+//
+//
+//
+//
+
+
+
+
+  proc testParallelPersistence() {
+    writeln("testingParallelPersistence... starting...");
+    writeln("");
+
+    //DB CONNECTION
+    var con = PgConnectionFactory(host=DB_HOST, user=DB_USER, database=DB_NAME, passwd=DB_PWD);
+    //PULL TABLE
+    var edgeTable = 'r.cui_confabulation',
+        fromField = 'source_cui',
+        toField = 'exhibited_cui';
+
+    var t: Timer;
+    t.start();
+    var nm = NamedMatrixFromPGSquare(con, edgeTable, fromField, toField, wField = "NONE");
+    t.stop();
+    writeln("Dimensions: ", nm.D);
+    writeln("Number of Nonzeros: ",nm.SD.size);
+    writeln("Total Loadtime: ",t.elapsed());
+
+    //PREPARE POSTGRES
+    var aTable = 'r.cui_confabulation_copy',
+        fromField2 = 'source_cui',
+        toField2 = 'exhibited_cui',
+        wField = 'w';
+
+    var q = """
+    DROP TABLE IF EXISTS %s;
+    CREATE TABLE %s (%s varchar NOT NULL, %s varchar NOT NULL, %s float NOT NULL);
+    """;
+
+    var b: Timer;
+    b.start();
+    var cursor = con.cursor();
+    cursor.execute(q,(aTable, aTable, fromField2, toField2, wField));
+    b.stop();
+    writeln("Time to Prepare Postgres: ",b.elapsed());
+
+    var pcon = new PgParallelConnection(host=DB_HOST, user=DB_USER, database=DB_NAME, passwd=DB_PWD);
+
+    //PERSIST MATRIX
+    var t1: Timer;
+    t1.start();
+    persistNMParallelConn(pcon, aTable, fromField2, toField2, wField, nm);
+  //  persistSparseMatrix(con, 1000, aTable, fromField2, toField2, wField, nm.X);
+    t1.stop();
+    writeln("Time to Persist Using Concurrent Connections: ",t1.elapsed());
+
+    writeln("");
+    writeln("testParallelPersistence... done... ");
+    writeln("");
+    writeln("");
   }
 
 
@@ -302,6 +369,7 @@ class CdoExtrasTest : UnitTest {
     super.run();
     testPingPostgres();
     testBuildNamedMatrix();
+    testParallelPersistence();
   //  testPersistNamedMatrix();
   //  testParBuilder();
   //  testSibBuilder();
