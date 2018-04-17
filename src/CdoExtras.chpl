@@ -765,7 +765,7 @@ proc buildCUIMatrixWithRelType_BATCHED(con: Connection, batchsize: int, relType:
     var t: Timer;
     t.start();
     for (i,j) in N.SD {
-      data.push_back((aTable, fromField, toField, N.rows.get(i),, N.cols.get(j), N.get(i,j)));
+      data.push_back((aTable, fromField, toField, N.rows.get(i), N.cols.get(j), N.get(i,j)));
     }
     t.stop();
     writeln("Time Prepare Data Array: ",t.elapsed());
