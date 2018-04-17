@@ -208,6 +208,130 @@ proc NamedMatrixFromPGSquare(con: Connection
 
 
 
+proc NamedMatrixFromPGSquare_(con: Connection
+  , edgeTable: string
+  , fromField: string, toField: string, wField: string = "NONE") {
+
+    var q = """
+    SELECT ftr
+    FROM (
+      SELECT distinct(%s) AS ftr FROM %s
+      UNION ALL
+      SELECT distinct(%s) AS ftr FROM %s
+    ) AS a
+    GROUP BY ftr ORDER BY ftr;
+    """;
+
+    var t: Timer;
+    t.start();
+    var cursor = con.cursor();
+    cursor.query(q, (fromField, edgeTable, toField, edgeTable));
+    t.stop();
+    writeln("BiMap Query Time: ",t.elapsed());
+
+    var t1: Timer;
+    t1.start();
+    var rows1: BiMap = new BiMap();
+    for row in cursor {
+      rows1.add(row['ftr']);
+    }
+    t1.stop();
+    writeln("BiMap Build Time: ",t1.elapsed());
+    writeln("BiMap Size: ",rows1.size());
+
+    delete cursor;
+
+    var t2: Timer;
+    t2.start();
+    var D: domain(2) = {1..rows1.size(), 1..rows1.size()},
+        SD = CSRDomain(D),
+        X: [SD] real;
+    var nm = new NamedMatrix(X=X);
+    nm.rows = rows1;
+    nm.cols = rows1;
+    t2.stop();
+    writeln("Time to Initialize NamedMatrix: ",t2.elapsed());
+
+
+    var t3: Timer;
+    t3.start();
+    var cursor2 = con.cursor();
+    if wField == "NONE" {
+      var r = """
+      SELECT %s, %s
+      FROM %s
+      ORDER BY %s, %s ;
+      """;
+      cursor2.query(r, (fromField, toField, edgeTable, fromField, toField));
+    } else if wField != "NONE" {
+      var r = """
+      SELECT %s, %s, %s
+      FROM %s
+      ORDER BY %s, %s ;
+      """;
+      cursor2.query(r, (fromField, toField, wField, edgeTable, fromField, toField));
+    }
+    t3.stop();
+    writeln("Time for Non-zeros Query: ",t3.elapsed());
+
+
+    var t4: Timer;
+    t4.start();
+    var size = cursor2.rowcount(): int;
+    var count = 0: int,
+        dom = {1..size},
+        indices: [dom] (int, int),
+        values: [dom] real;
+    t4.stop();
+    writeln("Time to Initialize Index/Value Arrays: ",t4.elapsed());
+
+
+    var t5: Timer;
+    t5.start();
+    for row in cursor2 {
+      count += 1;
+      indices[count]=(
+         rows1.get(row[fromField])
+        ,rows1.get(row[toField])
+        );
+      if wField != "NONE" {
+        try! values[count] = row[wField]: real; // don't understand why the try! is necessary
+      }
+    }
+    t5.stop();
+    writeln("Time to Graft Indices/Values: ",t5.elapsed());
+    delete cursor2;
+
+    var t6: Timer;
+    t6.start();
+    nm.SD.bulkAdd(indices);
+    t6.stop();
+    writeln("Time to bulkAdd to Sparse Domain: ",t6.elapsed());
+
+
+    var t7: Timer;
+    t7.start();
+    if wField == "NONE" {
+      forall (i,j) in indices {
+          nm.X(i,j) = 1;
+      }
+    } else if wField != "NONE" {
+      forall (ij, a) in zip(indices, values) {
+        nm.X(ij) = a;
+      }
+    }
+    t7.stop();
+    writeln("Time to Graft Values: ",t7.elapsed());
+
+  return nm;
+}
+
+
+
+
+
+
+
 proc buildCUIMatrixWithRelType(con: Connection, relType: string) {
   var q = """
   SELECT ftr
@@ -645,17 +769,17 @@ proc buildCUIMatrixWithRelType_BATCHED(con: Connection, batchsize: int, relType:
        var dom: domain(1) = {1..0};
        var ts: [dom] (string, string, string, string, string);
        for (i,j) in N.SD {
-         var t: Timer;
-         t.start();
+//         var t: Timer;
+  //       t.start();
          ts.push_back((aTable: string, fromField: string, toField: string, N.rows.get(i): string, N.cols.get(j): string));
          count += 1;
          if count >= batchsize {
-           pcon.execute(q,ts);
+  //         pcon.execute(q,ts);
            count = 0;
            var reset: [dom] (string, string, string, string, string);
            ts = reset;
-           t.stop();
-           writeln("Batch Time: ",t.elapsed());
+//           t.stop();
+//           writeln("Batch Time: ",t.elapsed());
          }
        }
        pcon.execute(q,ts);
@@ -666,25 +790,25 @@ proc buildCUIMatrixWithRelType_BATCHED(con: Connection, batchsize: int, relType:
        var dom: domain(1) = {1..0};
        var ts: [dom] (string, string, string, string, string, string, real);
        for (i,j) in N.SD {
-         var t: Timer;
-         var t1: Timer;
-         t.start();
-         t1.start();
+//         var t: Timer;
+//         var t1: Timer;
+//         t.start();
+//         t1.start();
          ts.push_back((aTable: string, fromField: string, toField: string, wField: string, N.rows.get(i): string, N.cols.get(j): string, N.get(i,j): real));
          count += 1;
-         t1.stop();
-         writeln("Time to Push Back on Buffer: ",t1.elapsed());
+//         t1.stop();
+  //       writeln("Time to Push Back on Buffer: ",t1.elapsed());
          if count >= batchsize {
-           var t2: Timer;
-           t2.start();
+//           var t2: Timer;
+//           t2.start();
            pcon.execute(q,ts);
            count = 0;
            var reset: [dom] (string, string, string, string, string, string, real);
            ts = reset;
-           t2.stop();
-           t.stop();
-           writeln("Batch Execution Time: ",t2.elapsed());
-           writeln("Batch Time Total: ",t.elapsed());
+//           t2.stop();
+//           t.stop();
+//           writeln("Batch Execution Time: ",t2.elapsed());
+//           writeln("Batch Time Total: ",t.elapsed());
          }
        }
        pcon.execute(q,ts);

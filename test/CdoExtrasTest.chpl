@@ -17,11 +17,43 @@ class CdoExtrasTest : UnitTest {
   }
 
   proc setUp() { }
+
+
+
   proc testPingPostgres() {
+
+    writeln("testPingPostgres... starting...");
+    writeln("");
+
+    var t: Timer;
+    t.start();
     var con = PgConnectionFactory(host=DB_HOST, user=DB_USER, database=DB_NAME, passwd=DB_PWD);
+    t.stop();
+    writeln("Connection Time: ",t.elapsed());
+
+    writeln("");
+    writeln("testPingPostgres... done...");
+    writeln("");
+    writeln("");
   }
 
+
+
+
+//
+//
+//
+//
+//
+//
+
+
+
+
   proc testBuildNamedMatrix() {
+    writeln("testBuildNamedMatrix... starting...");
+    writeln("");
+
     var edgeTable = "r.cui_confabulation",
         fromField = "source_cui",
         toField = "exhibited_cui";
@@ -30,7 +62,7 @@ class CdoExtrasTest : UnitTest {
 
     var t: Timer;
     t.start();
-    var nm = NamedMatrixFromPGSquare(con, edgeTable, fromField, toField, wField = "NONE");
+    var nm = NamedMatrixFromPGSquare_(con, edgeTable, fromField, toField, wField = "NONE");
     t.stop();
     writeln("Dimensions: ", nm.D);
     writeln("Number of Nonzeros: ",nm.SD.size);
@@ -39,6 +71,82 @@ class CdoExtrasTest : UnitTest {
     writeln("");
     writeln("testBuildNamedMatrix... done...");
   }
+
+
+
+
+//
+//
+//
+//
+//
+//
+
+
+
+
+  proc testPersistNamedMatrix() {
+    //DB CONNECTION
+    var con = PgConnectionFactory(host=DB_HOST, user=DB_USER, database=DB_NAME, passwd=DB_PWD);
+    //PULL TABLE
+    var edgeTable = 'r.cui_confabulation',
+        fromField = 'source_cui',
+        toField = 'exhibited_cui';
+
+    var t: Timer;
+    t.start();
+    var nm = NamedMatrixFromPGSquare(con, edgeTable, fromField, toField, wField = "NONE");
+    t.stop();
+    writeln("Dimensions: ", nm.D);
+    writeln("Number of Nonzeros: ",nm.SD.size);
+    writeln("Total Loadtime: ",t.elapsed());
+/*
+    //PREPARE POSTGRES
+    var aTable = 'r.cui_confabulation_copy',
+        fromField2 = 'source_cui',
+        toField2 = 'exhibited_cui',
+        wField = 'w';
+
+    var q = """
+    DROP TABLE IF EXISTS %s;
+    CREATE TABLE %s (%s varchar NOT NULL, %s varchar NOT NULL, %s float NOT NULL);
+    """;
+    /*
+    var q = """
+    DROP TABLE IF EXISTS %s;
+    CREATE TABLE %s (%s int NOT NULL, %s int NOT NULL, %s float NOT NULL);
+    """;*/
+    var b: Timer;
+    b.start();
+    var cursor = con.cursor();
+    cursor.execute(q,(aTable, aTable, fromField2, toField2, wField));
+    b.stop();
+    writeln("Time to Prepare Postgres: ",b.elapsed());
+
+    //PERSIST MATRIX
+    var t1: Timer;
+    t1.start();
+    persistNamedMatrixP(con, aTable, fromField2, toField2, wField, nm);
+  //  persistSparseMatrix(con, 1000, aTable, fromField2, toField2, wField, nm.X);
+    t1.stop();
+    writeln("Time to Persist the NamedMatrix: ",t1.elapsed());
+*/
+    writeln("");
+    writeln("testPeristNamedMatrix... done... ");
+  }
+
+
+
+
+//
+//
+//
+//
+//
+//
+
+
+
 
   proc testParBuilder() {
     // CONNECT TO DB
@@ -83,13 +191,91 @@ class CdoExtrasTest : UnitTest {
   }
 
 
+
+
+//
+//
+//
+//
+//
+//
+
+
+
+
+  proc testParOps() {
+    // CONNECT TO DB
+    var con = PgConnectionFactory(host=DB_HOST, user=DB_USER, database=DB_NAME, passwd=DB_PWD);
+
+    // LOADING PARENT MATRIX
+    var edgeTable = 'a.umls_par_rel',
+        fromField = 'cui1',
+        toField = 'cui2',
+        wField = 'w';
+
+    var t1: Timer;
+    t1.start();
+    var parentMatrix = NamedMatrixFromPGSquare(con, edgeTable, fromField, toField, wField);
+    t1.stop();
+    writeln("Dimensions of Parent Matrix: ", parentMatrix.D);
+    writeln("Number of Edges: ",parentMatrix.SD.size);
+    writeln("Total Loadtime: ",t1.elapsed());
+
+/*
+    var parTrans = parentMatrix.transpose();
+    var simSquare = parentMatrix.ndot(parTrans);
+
+
+
+
+    var aTable = 'a.umls_par_rel',
+        fromField = 'cui1',
+        toField = 'cui2',
+        wField = 'w';
+
+    //PREPARING POSTGRES
+    var q = """
+    DROP TABLE IF EXISTS %s;
+    CREATE TABLE %s (%s varchar NOT NULL, %s varchar NOT NULL, %s float NOT NULL);
+    """;
+    var b: Timer;
+    b.start();
+    var cursor = con.cursor();
+    cursor.execute(q,(aTable, aTable, fromField, toField, wField));
+    b.stop();
+    writeln("Time to Prepare Postgres: ",b.elapsed());
+
+    //PERSISTING PARENT MATRIX
+    var t2: Timer;
+    t2.start();
+    persistNamedMatrix(con, aTable, fromField, toField, wField, parentMatrix);
+    t2.stop();
+    writeln("Time to Persist PAR: ",t2.elapsed());
+*/
+    writeln("");
+    writeln("testParBuilder... done...");
+  }
+
+
+
+
+//
+//
+//
+//
+//
+//
+
+
+
+
   proc testSibBuilder() {
     // CONNECT TO DB
     var con = PgConnectionFactory(host=DB_HOST, user=DB_USER, database=DB_NAME, passwd=DB_PWD);
 
     var t2: Timer;
     t2.start();
-    var siblingMatrix = buildCUIMatrixWithRelType_BATCHED(con, 100000, 'SIB');
+    var siblingMatrix = buildCUIMatrixWithRelType(con, 'SIB');
     t2.stop();
     writeln("Dimensions of Sibling Matrix: ", siblingMatrix.D);
     writeln("Number of Edges: ",siblingMatrix.SD.size);
@@ -99,76 +285,32 @@ class CdoExtrasTest : UnitTest {
     writeln("testSibBuilder... done...");
   }
 
-  proc testPersistNamedMatrixParallel() {
-    //DB CONNECTION
-    var con = PgConnectionFactory(host=DB_HOST, user=DB_USER, database=DB_NAME, passwd=DB_PWD);
-    //PULL TABLE
-    var edgeTable = 'r.cui_confabulation',
-        fromField = 'source_cui',
-        toField = 'exhibited_cui';
-
-    var t: Timer;
-    t.start();
-    var nm = NamedMatrixFromPGSquare(con, edgeTable, fromField, toField, wField = "NONE");
-    t.stop();
-    writeln("Dimensions: ", nm.D);
-    writeln("Number of Nonzeros: ",nm.SD.size);
-    writeln("Total Loadtime: ",t.elapsed());
 
 
 
-    //PREPARE POSTGRES
-    var aTable = 'r.cui_confabulation_copy',
-        fromField2 = 'source_cui',
-        toField2 = 'exhibited_cui',
-        wField = 'w';
-
-    var q = """
-    DROP TABLE IF EXISTS %s;
-    CREATE TABLE %s (%s varchar NOT NULL, %s varchar NOT NULL, %s float NOT NULL);
-    """;
+//
+//
+//
+//
+//
+//
 
 
-    /*
-    var q = """
-    DROP TABLE IF EXISTS %s;
-    CREATE TABLE %s (%s int NOT NULL, %s int NOT NULL, %s float NOT NULL);
-    """;*/
-    var b: Timer;
-    b.start();
-    var cursor = con.cursor();
-    cursor.execute(q,(aTable, aTable, fromField2, toField2, wField));
-    b.stop();
-    writeln("Time to Prepare Postgres: ",b.elapsed());
-
-    con.close();
-
-
-    //PERSIST MATRIX
-    var pcon = new PgParallelConnection(host=DB_HOST, user=DB_USER, database=DB_NAME, passwd=DB_PWD);
-    var t1: Timer;
-    t1.start();
-    persistNamedMatrixPB(pcon, 800000, aTable, fromField2, toField2, wField, nm);
-  //  persistSparseMatrix(con, 1000, aTable, fromField2, toField2, wField, nm.X);
-    t1.stop();
-    writeln("Time to Persist the NamedMatrix: ",t1.elapsed());
-
-    writeln("");
-    writeln("testPeristNamedMatrix... done... ");
-  }
 
 
   proc run() {
     super.run();
-    testPersistNamedMatrixParallel();
-  //  testPingPostgres();
-  //  testBuildNamedMatrix();
+    testPingPostgres();
+    testBuildNamedMatrix();
+  //  testPersistNamedMatrix();
   //  testParBuilder();
   //  testSibBuilder();
+  //  testParOps();
 
     return 0;
   }
 }
+
 
 proc main(args: [] string) : int {
   const msg = """
