@@ -371,7 +371,7 @@ class CdoExtrasTest : UnitTest {
     super.run();
     testPingPostgres();
     testBuildNamedMatrix();
-    testParallelPersistence();
+  //  testParallelPersistence();
   //  testPersistNamedMatrix();
   //  testParBuilder();
   //  testSibBuilder();
