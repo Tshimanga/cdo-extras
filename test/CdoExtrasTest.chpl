@@ -69,6 +69,8 @@ class CdoExtrasTest : UnitTest {
     writeln("Number of Nonzeros: ",nm.SD.size);
     writeln("Total Loadtime: ",t.elapsed());
 
+    con.close();
+
     writeln("");
     writeln("testBuildNamedMatrix... done...");
     writeln("");
@@ -100,7 +102,7 @@ class CdoExtrasTest : UnitTest {
 
     var t: Timer;
     t.start();
-    var nm = NamedMatrixFromPGSquare(con, edgeTable, fromField, toField, wField = "NONE");
+    var nm = NamedMatrixFromPGSquare_(con, edgeTable, fromField, toField, wField = "NONE");
     t.stop();
     writeln("Dimensions: ", nm.D);
     writeln("Number of Nonzeros: ",nm.SD.size);
@@ -156,7 +158,11 @@ class CdoExtrasTest : UnitTest {
     writeln("");
 
     //DB CONNECTION
+    var c: Timer;
+    c.start();
     var con = PgConnectionFactory(host=DB_HOST, user=DB_USER, database=DB_NAME, passwd=DB_PWD);
+    c.stop();
+    writeln("Time to Establish Connection: ",c.elapsed());
     //PULL TABLE
     var edgeTable = 'r.cui_confabulation',
         fromField = 'source_cui',
@@ -164,7 +170,7 @@ class CdoExtrasTest : UnitTest {
 
     var t: Timer;
     t.start();
-    var nm = NamedMatrixFromPGSquare(con, edgeTable, fromField, toField, wField = "NONE");
+    var nm = NamedMatrixFromPGSquare_(con, edgeTable, fromField, toField, wField = "NONE");
     t.stop();
     writeln("Dimensions: ", nm.D);
     writeln("Number of Nonzeros: ",nm.SD.size);
@@ -369,9 +375,9 @@ class CdoExtrasTest : UnitTest {
 
   proc run() {
     super.run();
-    testPingPostgres();
-    testBuildNamedMatrix();
-  //  testParallelPersistence();
+  //  testPingPostgres();
+  //  testBuildNamedMatrix();
+    testParallelPersistence();
   //  testPersistNamedMatrix();
   //  testParBuilder();
   //  testSibBuilder();
