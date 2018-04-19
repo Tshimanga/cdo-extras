@@ -40,6 +40,19 @@ ORDER BY ftr, t ;
 */
 
 
+
+
+//
+//
+//
+//
+//
+//
+
+
+
+
+
 proc NamedMatrixFromPGRectangular(con: Connection
   , edgeTable: string
   , fromField: string, toField: string, wField: string = "NONE") {
@@ -127,6 +140,20 @@ proc NamedMatrixFromPGRectangular(con: Connection
 
 
 
+
+
+//
+//
+//
+//
+//
+//
+
+
+
+
+
+
 proc NamedMatrixFromPGSquare(con: Connection
   , edgeTable: string
   , fromField: string, toField: string, wField: string = "NONE") {
@@ -204,6 +231,20 @@ proc NamedMatrixFromPGSquare(con: Connection
 
   return nm;
 }
+
+
+
+
+
+//
+//
+//
+//
+//
+//
+
+
+
 
 
 
@@ -330,6 +371,269 @@ proc NamedMatrixFromPGSquare_(con: Connection
 
 
 
+//
+//
+//
+//
+//
+//
+
+
+
+
+
+proc NMFromPGSquare_BATCHED(con: Connection
+  , batchsize: int
+  , edgeTable: string
+  , fromField: string
+  , toField: string) {
+
+
+   // PREPARING NAMED MATRIX
+    var q = """
+    SELECT ftr
+    FROM (
+      SELECT distinct(%s) AS ftr FROM %s
+      UNION ALL
+      SELECT distinct(%s) AS ftr FROM %s
+    ) AS a
+    GROUP BY ftr ORDER BY ftr;
+    """;
+
+    var t: Timer;
+    t.start();
+    var cursor = con.cursor();
+    cursor.query(q, (fromField, edgeTable, toField, edgeTable));
+    t.stop();
+    writeln("BiMap Query Time: ",t.elapsed());
+
+    var t1: Timer;
+    t1.start();
+    var rows1: BiMap = new BiMap();
+    for row in cursor {
+      rows1.add(row['ftr']);
+    }
+    t1.stop();
+    writeln("BiMap Build Time: ",t1.elapsed());
+    writeln("BiMap Size: ",rows1.size());
+
+    delete cursor;
+
+    var t2: Timer;
+    t2.start();
+    var D: domain(2) = {1..rows1.size(), 1..rows1.size()},
+        SD = CSRDomain(D),
+        X: [SD] real;
+    var nm = new NamedMatrix(X=X);
+    nm.rows = rows1;
+    nm.cols = rows1;
+    t2.stop();
+    writeln("Time to Initialize NamedMatrix: ",t2.elapsed());
+
+   // BATCHING DETAILS
+    var t3: Timer;
+    t3.start();
+    var cursor2 = con.cursor();
+    var r = """
+    SELECT *
+    FROM %s;
+    """;
+    cursor2.query(r, (edgeTable,));
+    var numRows = cursor2.rowcount();
+    delete cursor2;
+    var batches = ((numRows/batchsize) + 1): int;
+    writeln("Number of Edge Rows: ",numRows);
+    writeln("Number of Batches: ",batches);
+    t3.stop();
+    writeln("Time for Batching Details: ",t3.elapsed());
+
+
+  // DATA EXTRACTION
+    for n in {1..batches} {
+      var t4: Timer;
+      t4.start();
+      var r = """
+      SELECT %s, %s
+      FROM %s
+      ORDER BY %s, %s
+      LIMIT %i
+      OFFSET %i;
+      """;
+      var offset = batchsize*(n-1): int;
+      writeln("Offset for Batch ",n,": ",offset);
+      var t5: Timer;
+      t5.start();
+      var edgeCursor = con.cursor();
+      try! edgeCursor.query(r, (fromField, toField, edgeTable, fromField, toField, batchsize: string, offset: string));
+      var batchCard = edgeCursor.rowcount(): int;
+      var count = 0: int,
+          dom = {1..batchCard},
+          indices: [dom] (int,int);
+      writeln("Size of Batch ",n,": ",batchCard);
+      var t6: Timer;
+      t6.start();
+      for edge in edgeCursor {
+        count += 1;
+        indices[count] = (nm.rows.get(edge[fromField]),nm.cols.get(edge[toField]));
+      }
+      delete edgeCursor;
+      t6.stop;
+      writeln("Time Spent Using edgeCursor ",n,": ",t6.elapsed());
+
+      var t7: Timer;
+      t7.start();
+      nm.SD.bulkAdd(indices);
+      t7.stop();
+      writeln("Time to bulkAdd Batch  ",n," to Sparse Domain: ",t7.elapsed());
+
+      var t8: Timer;
+      t8.start();
+      forall (i,j) in indices {
+        nm.X(i,j) = 1;
+      }
+      t8.stop();
+      writeln("Time to Write Values for Batch ",n," of Edges: ",t6.elapsed());
+      t4.stop();
+      writeln("Time to Work Through Batch ",n,": ",t4.elapsed());
+    }
+
+  return nm;
+}
+
+
+
+
+
+
+//
+//
+//
+//
+//
+//
+
+
+
+
+
+
+proc NMFromPGSqr_BATCHED(con: Connection
+  , batchsize: int
+  , edgeTable: string
+  , fromField: string
+  , toField: string) {
+
+    // MAKING SURE THE DOMAIN COVERS ALL CUIs
+    var q = """
+    SELECT ftr
+    FROM (
+      SELECT distinct(%s) AS ftr FROM %s
+      UNION ALL
+      SELECT distinct(%s) AS ftr FROM %s
+    ) AS a
+    GROUP BY ftr ORDER BY ftr;
+    """;
+
+    // PREPARE NAMEDMATRIX
+    var t: Timer;
+    t.start();
+    var vertexParams = (fromField, edgeTable, toField, edgeTable);
+    var namedMatrix = prepareNamedBase(con, q, vertexParams);
+    t.stop();
+    writeln("Time to Prepare NamedMatrix: ",t.elapsed());
+    writeln("Domain: ",namedMatrix.D);
+    writeln("Number of Rows (Sanity Check): ",namedMatrix.rows.size());
+
+    // BATCHING DETAILS
+    var qNumRows = """
+    SELECT *
+    FROM %s;
+    """;
+//    try! qNumRows.format(relType);
+    var t1: Timer;
+    t1.start();
+    var numRowCursor = con.cursor();
+    var countingParams = edgeTable;
+    numRowCursor.query(q, (edgeTable,));
+    var numRows = numRowCursor.rowcount();
+    delete numRowCursor;
+    var batches = ((numRows/batchsize) + 1): int;
+    writeln("Number of Edge Rows: ",numRows);
+    writeln("Number of Batches: ",batches);
+//    var batch = 0: int;
+    t1.stop();
+    writeln("Time to Determine Batching Details: ",t1.elapsed());
+
+    for n in {1..batches} {
+      var t2: Timer;
+      t2.start();
+      var r = """
+      SELECT %s, %s
+      FROM %s
+      ORDER BY %s, %s
+      LIMIT %i
+      OFFSET %i;
+      """;
+      var offset = n*batchsize: int;
+      writeln("Offset for Batch ",n,": ",offset);
+      var t3: Timer;
+      t3.start();
+      var edgeCursor = con.cursor();
+      try! edgeCursor.query(r, (fromField, toField, edgeTable, fromField, toField, batchsize: string, offset: string));
+      t3.stop();
+      writeln("Time to Pull Up Edge Cursor: ",t3.elapsed());
+      var size = edgeCursor.rowcount(): int;
+      var innerCount = 0: int,
+          dom = {1..size},
+          indices: [dom] (int,int);
+      writeln("Size of Batch ",n,": ",size);
+      var t4: Timer;
+      t4.start();
+      for edge in edgeCursor {
+        innerCount += 1;
+        indices[innerCount]=(namedMatrix.rows.get(edge[fromField]),namedMatrix.cols.get(edge[toField]));
+      }
+      delete edgeCursor;
+      t4.stop();
+      writeln("Time Spent Using the Cursor: ",t4.elapsed());
+
+      var t5: Timer;
+      t5.start();
+      namedMatrix.SD.bulkAdd(indices);
+      t5.stop();
+      writeln("Time to bulkAdd Batch ",n," to Sparse Domain: ",t5.elapsed());
+
+
+      var t6: Timer;
+      t6.start();
+      forall (i,j) in indices {
+        namedMatrix.X(i,j) = 1;
+      }
+      t6.stop();
+      writeln("Time to Write Values for Batch ",n," of Edges: ",t6.elapsed());
+    //  namedMatrix.expandNamedMatrix(con: Connection, r, edgeTable, fromField, toField, batchsize, offset, namedMatrix.rows, namedMatrix.cols);
+  //    count += 1;
+      t2.stop();
+      writeln("Time to Work Through Batch ",n,": ",t2.elapsed());
+    }
+
+  return namedMatrix;
+}
+
+
+
+
+
+//
+//
+//
+//
+//
+//
+
+
+
+
 
 
 proc buildCUIMatrixWithRelType(con: Connection, relType: string) {
@@ -426,23 +730,44 @@ proc buildCUIMatrixWithRelType(con: Connection, relType: string) {
   return nm;
 }
 
-proc prepareNamedBase(con: Connection, q: string) {
+
+
+
+
+
+
+//
+//
+//
+//
+//
+//
+
+
+
+
+
+
+
+proc prepareNamedBase(con: Connection, q: string, params) {
   var t1: Timer;
   t1.start();
   var vertexCursor = con.cursor();
-  vertexCursor.query(q);
+  vertexCursor.query(q, params);
   t1.stop();
   writeln("Time to Pull Vertex Data: ", t1.elapsed());
+  writeln("Number of Rows: ",vertexCursor.rowcount());
 
 
   var t2: Timer;
   t2.start();
   var vertices: BiMap = new BiMap;
   for row in vertexCursor {
-    vertices.add(row['node']);
+    vertices.add(row['ftr']);
   }
   t2.stop();
   writeln("Time to Build Vertex Set: ",t2.elapsed());
+  writeln("Number of Vertices: ",vertices.size());
 
   var t3: Timer;
   t3.start();
@@ -453,23 +778,44 @@ proc prepareNamedBase(con: Connection, q: string) {
   var nm = new NamedMatrix(X=X);
   nm.rows = vertices;
   nm.cols = vertices;
+  writeln("Number of Rows: ",nm.rows.size());
   delete vertexCursor;
   delete vertices;
   t3.stop();
   writeln("Time to Prepare Named Matrix: ",t3.elapsed());
+  writeln("Domain: ",D);
 
   return nm;
 }
 
 
-proc NamedMatrix.expandSparseDomain(con: Connection, q: string) {
+
+
+
+//
+//
+//
+//
+//
+//
+
+
+
+
+
+
+proc NamedMatrix.expandNamedMatrix(con: Connection, q: string, eTable, fromField, toField, batchsize, offset, rows:BiMap, cols: BiMap) {
   var edgeCursor = con.cursor();
 
   var t4: Timer;
   t4.start();
-  try! edgeCursor.query(q); // Pull Edges with relType
+  try! edgeCursor.query(q, (fromField, toField, eTable, fromField, toField, batchsize: string, offset: string)); // Pull Edges with relType
   t4.stop();
-  writeln("Time to Pull Edge Data: ",t4.elapsed());
+  writeln("Time to Curate Edge Data: ",t4.elapsed());
+  writeln("Number of Rows: ",edgeCursor.rowcount());
+  writeln("Batch Size: ", batchsize);
+  writeln("Offset: ",offset);
+
 
   var t5: Timer;
   t5.start();
@@ -479,16 +825,16 @@ proc NamedMatrix.expandSparseDomain(con: Connection, q: string) {
       indices: [dom] (int, int);
   t5.stop();
   writeln("Time to Initialize Index Buffer: ",t5.elapsed());
+  writeln("Size: ",size);
+  writeln("Number of Rows in NM:  ",rows.size());
 
 
   var t6: Timer;
   t6.start();
   for edge in edgeCursor {
     count += 1;
-    indices[count]=(
-      this.rows.get(edge['cui1'])
-     ,this.cols.get(edge['cui2'])
-     );
+    writeln("From ",edge[fromField]," to ",edge[toField]);
+    indices[count]=(rows.get(edge[fromField]),cols.get(edge[toField]));
   }
   t6.stop();
   writeln("Time to Graft Indices: ",t6.elapsed());
@@ -500,7 +846,31 @@ proc NamedMatrix.expandSparseDomain(con: Connection, q: string) {
   this.SD.bulkAdd(indices);  // Expand Sparse Domain in Bulk
   t7.stop();
   writeln("Time to bulkAdd to Sparse Domain: ",t7.elapsed());
+
+  var t8: Timer;
+  t8.start();
+  forall (i,j) in indices {
+    this.X(i,j) = 1;
+  }
+  t8.stop();
+  writeln("Time to Set Entry Values: ",t8.elapsed());
 }
+
+
+
+
+
+//
+//
+//
+//
+//
+//
+
+
+
+
+
 
 proc buildCUIMatrixWithRelType_(con: Connection, relType: string) {
   // MAKING SURE THE DOMAIN COVERS ALL CUIs
@@ -539,6 +909,22 @@ proc buildCUIMatrixWithRelType_(con: Connection, relType: string) {
   // RETURN FINISHED MATRIX
   return namedMatrix;
 }
+
+
+
+
+
+//
+//
+//
+//
+//
+//
+
+
+
+
+
 
 proc buildCUIMatrixWithRelType_BATCHED(con: Connection, batchsize: int, relType: string) {
   // MAKING SURE THE DOMAIN COVERS ALL CUIs
@@ -702,6 +1088,21 @@ proc buildCUIMatrixWithRelType_BATCHED(con: Connection, batchsize: int, relType:
   }
 
 
+
+
+
+  //
+  //
+  //
+  //
+  //
+  //
+
+
+
+
+
+
    proc persistNamedMatrix(con: Connection, batchsize: int, aTable: string, fromField: string, toField: string, wField: string, N: NamedMatrix) {
      var q: string;
      if wField == "NONE" {
@@ -757,20 +1158,61 @@ proc buildCUIMatrixWithRelType_BATCHED(con: Connection, batchsize: int, relType:
      }
    }
 
-  proc persistNMParallelConn(pcon, aTable: string, fromField: string, toField: string, wField: string, N: NamedMatrix) {
-    var q = "INSERT INTO %s (%s, %s, %s) VALUES ('%s', '%s', %s)";
-    var count: int = 0;
-    var dom: domain(1) = {1..0};
-    var data: [dom] (string, string, string, string, string, string, real);
-    var t: Timer;
-    t.start();
-    for (i,j) in N.SD {
-      data.push_back((aTable, fromField, toField, wField, N.rows.get(i), N.cols.get(j), N.get(i,j)));
-    }
-    t.stop();
-    writeln("Time Prepare Data Array: ",t.elapsed());
-    pcon.execute(q,data);
-  }
+
+
+
+
+   //
+   //
+   //
+   //
+   //
+   //
+
+
+
+
+
+
+   proc persistNMParallelConn(pcon, aTable: string, fromField: string, toField: string, wField: string, N: NamedMatrix) {
+     var q = "INSERT INTO %s (%s, %s, %s) VALUES ('%s', '%s', %s)";
+     var count: int = 0;
+     var dom: domain(1) = {1..0};
+     var data: [dom] (string, string, string, string, string, string, real);
+     var t: Timer;
+     t.start();
+     for (i,j) in N.SD {
+       data.push_back((aTable, fromField, toField, wField, N.rows.get(i), N.cols.get(j), N.get(i,j)));
+     }
+     t.stop();
+     writeln("Time Prepare Data Array: ",t.elapsed());
+     pcon.execute(q,data);
+   }
+
+
+   //
+   //
+   //
+   //
+   //
+   //
+
+
+
+   proc persistNMParallelConn(pcon, aTable: string, fromField: string, toField: string, wField: string, X: [] real, rows: BiMap, cols: BiMap) {
+     var q = "INSERT INTO %s (%s, %s, %s) VALUES ('%s', '%s', %s)";
+     var count: int = 0;
+     var dom: domain(1) = {1..0};
+     var data: [dom] (string, string, string, string, string, string, real);
+     var t: Timer;
+     t.start();
+     for (i,j) in X.domain {
+       data.push_back((aTable, fromField, toField, wField, rows.get(i), cols.get(j), X(i,j)));
+     }
+     t.stop();
+     writeln("Time Prepare Data Array: ",t.elapsed());
+     pcon.execute(q,data);
+   }
 
 
    proc persistNamedMatrixPB(pcon, batchsize: int, aTable: string, fromField: string, toField: string, wField: string, N: NamedMatrix) {
@@ -829,6 +1271,21 @@ proc buildCUIMatrixWithRelType_BATCHED(con: Connection, batchsize: int, relType:
    }
 
 
+
+
+
+   //
+   //
+   //
+   //
+   //
+   //
+
+
+
+
+
+
    proc persistNamedMatrixP(pcon, aTable: string
      , fromField: string, toField: string, wField: string
      , N: NamedMatrix) {
@@ -879,6 +1336,21 @@ proc buildCUIMatrixWithRelType_BATCHED(con: Connection, batchsize: int, relType:
    }
 
 
+
+
+
+   //
+   //
+   //
+   //
+   //
+   //
+
+
+
+
+
+
   // BATCH PERSISTENCE
    proc persistSparseMatrix(con: Connection, batchsize: int, aTable: string
      , fromField: string, toField: string, weightField: string
@@ -905,6 +1377,22 @@ proc buildCUIMatrixWithRelType_BATCHED(con: Connection, batchsize: int, relType:
      cur.execute(q,ts);
    }
 
+
+
+
+
+   //
+   //
+   //
+   //
+   //
+   //
+
+
+
+
+
+
   //SERIAL PERSISTANCE FUNCTION FOR PERFORMANCE COMPARISONS
   proc persistSparseMatrix_(con: Connection, aTable: string
     , fromField: string, toField: string, weightField: string
@@ -918,6 +1406,21 @@ proc buildCUIMatrixWithRelType_BATCHED(con: Connection, batchsize: int, relType:
       cur.execute(q, t);
     }
   }
+
+
+
+
+
+  //
+  //
+  //
+  //
+  //
+  //
+
+
+
+
 
 
   // PARALLEL PERSISTENCE FUNCTION FOR PERFORMANCE COMPARISONS

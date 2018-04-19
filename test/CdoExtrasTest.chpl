@@ -50,32 +50,72 @@ class CdoExtrasTest : UnitTest {
 
 
 
-  proc testBuildNamedMatrix() {
-    writeln("testBuildNamedMatrix... starting...");
-    writeln("");
+proc testBuildNamedMatrix() {
+  writeln("testBuildNamedMatrix... starting...");
+  writeln("");
 
-    var edgeTable = "r.cui_confabulation",
-        fromField = "source_cui",
-        toField = "exhibited_cui";
+  var edgeTable = "r.cui_confabulation",
+      fromField = "source_cui",
+      toField = "exhibited_cui";
 
-    var con = PgConnectionFactory(host=DB_HOST, user=DB_USER, database=DB_NAME, passwd=DB_PWD);
+  var con = PgConnectionFactory(host=DB_HOST, user=DB_USER, database=DB_NAME, passwd=DB_PWD);
 
-    var t: Timer;
-    t.start();
-    // NamedMatrixFromPGSquare_ is the verbose version of the procedure
-    var nm = NamedMatrixFromPGSquare_(con, edgeTable, fromField, toField, wField = "NONE");
-    t.stop();
-    writeln("Dimensions: ", nm.D);
-    writeln("Number of Nonzeros: ",nm.SD.size);
-    writeln("Total Loadtime: ",t.elapsed());
+  var t: Timer;
+  t.start();
+  // NamedMatrixFromPGSquare_ is the verbose version of the procedure
+  var nm = NamedMatrixFromPGSquare_(con, edgeTable, fromField, toField, wField = "NONE");
+  t.stop();
+  writeln("Dimensions: ", nm.D);
+  writeln("Number of Nonzeros: ",nm.SD.size);
+  writeln("Total Loadtime: ",t.elapsed());
 
-    con.close();
+  con.close();
 
-    writeln("");
-    writeln("testBuildNamedMatrix... done...");
-    writeln("");
-    writeln("");
-  }
+  writeln("");
+  writeln("testBuildNamedMatrix... done...");
+  writeln("");
+  writeln("");
+}
+
+
+
+
+//
+//
+//
+//
+//
+//
+
+
+
+
+proc testBatchedExtractor() {
+  writeln("testBatchedExtractor... starting...");
+  writeln("");
+
+  var edgeTable = "r.cui_confabulation",
+      fromField = "source_cui",
+      toField = "exhibited_cui";
+
+  var con = PgConnectionFactory(host=DB_HOST, user=DB_USER, database=DB_NAME, passwd=DB_PWD);
+
+  var t: Timer;
+  t.start();
+  // NamedMatrixFromPGSquare_ is the verbose version of the procedure
+  var nm = NMFromPGSqr_BATCHED(con, 100000, edgeTable, fromField, toField);
+  t.stop();
+  writeln("Dimensions: ", nm.D);
+  writeln("Number of Nonzeros: ",nm.SD.size);
+  writeln("Total Loadtime: ",t.elapsed());
+
+  con.close();
+
+  writeln("");
+  writeln("testBatchedExtractor... done...");
+  writeln("");
+  writeln("");
+}
 
 
 
@@ -176,11 +216,20 @@ class CdoExtrasTest : UnitTest {
     writeln("Number of Nonzeros: ",nm.SD.size);
     writeln("Total Loadtime: ",t.elapsed());
 
+    con.close();
+
     //PREPARE POSTGRES
     var aTable = 'r.cui_confabulation_copy',
         fromField2 = 'source_cui',
         toField2 = 'exhibited_cui',
         wField = 'w';
+
+    //DB CONNECTION
+    var c2: Timer;
+    c2.start();
+    var con2 = PgConnectionFactory(host=DB_HOST, user=DB_USER, database=DB_NAME, passwd=DB_PWD);
+    c2.stop();
+    writeln("Time to Establish New Connection: ",c2.elapsed());
 
     var q = """
     DROP TABLE IF EXISTS %s;
@@ -189,10 +238,12 @@ class CdoExtrasTest : UnitTest {
 
     var b: Timer;
     b.start();
-    var cursor = con.cursor();
-    cursor.execute(q,(aTable, aTable, fromField2, toField2, wField));
+    var cursor2 = con2.cursor();
+    cursor2.execute(q,(aTable, aTable, fromField2, toField2, wField));
     b.stop();
     writeln("Time to Prepare Postgres: ",b.elapsed());
+
+    con2.close();
 
     var pcon = new PgParallelConnection(host=DB_HOST, user=DB_USER, database=DB_NAME, passwd=DB_PWD);
 
@@ -377,7 +428,8 @@ class CdoExtrasTest : UnitTest {
     super.run();
   //  testPingPostgres();
   //  testBuildNamedMatrix();
-    testParallelPersistence();
+    testBatchedExtractor();
+  //  testParallelPersistence();
   //  testPersistNamedMatrix();
   //  testParBuilder();
   //  testSibBuilder();
