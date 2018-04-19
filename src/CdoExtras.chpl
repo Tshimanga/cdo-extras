@@ -280,6 +280,7 @@ proc NamedMatrixFromPGSquare_(con: Connection
     writeln("BiMap Build Time: ",t1.elapsed());
     writeln("BiMap Size: ",rows1.size());
 
+    cursor.close();
     delete cursor;
 
     var t2: Timer;
@@ -341,6 +342,8 @@ proc NamedMatrixFromPGSquare_(con: Connection
     }
     t5.stop();
     writeln("Time to Graft Indices/Values: ",t5.elapsed());
+
+    cursor2.close();
     delete cursor2;
 
     var t6: Timer;

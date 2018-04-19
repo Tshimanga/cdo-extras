@@ -243,6 +243,8 @@ proc testBatchedExtractor() {
     b.stop();
     writeln("Time to Prepare Postgres: ",b.elapsed());
 
+    cursor2.close();
+    delete cursor2;
     con2.close();
 
     var pcon = new PgParallelConnection(host=DB_HOST, user=DB_USER, database=DB_NAME, passwd=DB_PWD);
@@ -428,8 +430,8 @@ proc testBatchedExtractor() {
     super.run();
   //  testPingPostgres();
   //  testBuildNamedMatrix();
-    testBatchedExtractor();
-  //  testParallelPersistence();
+  //  testBatchedExtractor();
+    testParallelPersistence();
   //  testPersistNamedMatrix();
   //  testParBuilder();
   //  testSibBuilder();
