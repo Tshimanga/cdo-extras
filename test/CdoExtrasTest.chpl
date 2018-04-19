@@ -103,7 +103,7 @@ proc testBatchedExtractor() {
   var t: Timer;
   t.start();
   // NamedMatrixFromPGSquare_ is the verbose version of the procedure
-  var nm = NMFromPGSqr_BATCHED(con, 100000, edgeTable, fromField, toField);
+  var nm = NMFromPGSquare_BATCHED(con, 100000, edgeTable, fromField, toField);
   t.stop();
   writeln("Dimensions: ", nm.D);
   writeln("Number of Nonzeros: ",nm.SD.size);

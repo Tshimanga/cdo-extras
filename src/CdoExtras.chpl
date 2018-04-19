@@ -477,7 +477,7 @@ proc NMFromPGSquare_BATCHED(con: Connection
         indices[count] = (nm.rows.get(edge[fromField]),nm.cols.get(edge[toField]));
       }
       delete edgeCursor;
-      t6.stop;
+      t6.stop();
       writeln("Time Spent Using edgeCursor ",n,": ",t6.elapsed());
 
       var t7: Timer;
